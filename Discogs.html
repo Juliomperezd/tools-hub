@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Discogs Random</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background: #111;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    /* Background photo */
+    #bg-a, #bg-b {
+      position: fixed;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      transition: opacity 1.2s ease;
+      z-index: -2;
+    }
+
+    #bg-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      z-index: -1;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      box-sizing: border-box;
+    }
+
+    button#mainBtn {
+      background: none;
+      border: 2px solid #777;
+      color: #777;
+      padding: 14px 28px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 40px;
+      letter-spacing: 1px;
+    }
+
+    button#mainBtn:hover:not(:disabled) {
+      background: #777;
+      color: #000;
+    }
+
+    button#mainBtn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    #filters {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 700px;
+      width: 100%;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .filter-group label {
+      color: #555;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .filter-group input[type="number"],
+    .filter-group input[type="text"] {
+      background: none;
+      border: 1px solid #333;
+      color: #777;
+      padding: 7px 10px;
+      font-size: 14px;
+      font-family: Arial, Helvetica, sans-serif;
+      box-sizing: border-box;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .filter-group input[type="number"] {
+      width: 80px;
+    }
+
+    .filter-group input[type="text"] {
+      width: 220px;
+    }
+
+    .filter-group input[type="text"]::placeholder {
+      color: #444;
+    }
+
+    /* Genre checkboxes */
+    #genreList {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    #genreList::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #genreList::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+
+    #genreList::-webkit-scrollbar-thumb {
+      background: #333;
+    }
+
+    .genre-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      color: #666;
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .genre-check:hover {
+      color: #999;
+    }
+
+    .genre-check input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border: 1px solid #444;
+      background: none;
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .genre-check input[type="checkbox"]:checked {
+      border-color: #777;
+      background: #777;
+    }
+
+    .genre-check input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 0px;
+      width: 4px;
+      height: 7px;
+      border: 2px solid #111;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+
+    .year-range {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .year-range span {
+      color: #333;
+      font-size: 12px;
+    }
+
+    /* Exclusion tags */
+    #excludeTags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+      max-width: 220px;
+    }
+
+    .tag {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      color: #666;
+      font-size: 11px;
+      padding: 3px 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tag button {
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 0;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .tag button:hover {
+      color: #999;
+      background: none;
+    }
+
+    /* card */
+    #card {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    #cover {
+      width: 240px;
+      height: 240px;
+      object-fit: cover;
+      margin-bottom: 24px;
+    }
+
+    #cover-placeholder {
+      width: 240px;
+      height: 240px;
+      background: #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      color: #444;
+      font-size: 14px;
+    }
+
+    #artist {
+      color: #888;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    #album {
+      color: #555;
+      font-size: 16px;
+      font-style: italic;
+      margin-bottom: 20px;
+    }
+
+    #track {
+      color: #ddd;
+      font-size: 48px;
+      font-weight: bold;
+      line-height: 1.1;
+      margin-bottom: 28px;
+    }
+
+    .links {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .links a {
+      background: none;
+      border: 1px solid #555;
+      color: #777;
+      padding: 6px 14px;
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+    }
+
+    .links a:hover {
+      background: #555;
+      color: #000;
+    }
+
+    #status {
+      color: #555;
+      font-size: 13px;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="bg-a"></div>
+  <div id="bg-b"></div>
+  <div id="bg-overlay"></div>
+
+  <div id="filters">
+    <div class="filter-group">
+      <label>Género (vacío = todos)</label>
+      <div id="genreList">
+        <label class="genre-check"><input type="checkbox" value="Blues"> Blues</label>
+        <label class="genre-check"><input type="checkbox" value="Brass &amp; Military"> Brass &amp; Military</label>
+        <label class="genre-check"><input type="checkbox" value="Children's"> Children's</label>
+        <label class="genre-check"><input type="checkbox" value="Classical"> Classical</label>
+        <label class="genre-check"><input type="checkbox" value="Electronic"> Electronic</label>
+        <label class="genre-check"><input type="checkbox" value="Folk, World, &amp; Country"> Folk, World, &amp; Country</label>
+        <label class="genre-check"><input type="checkbox" value="Funk / Soul"> Funk / Soul</label>
+        <label class="genre-check"><input type="checkbox" value="Hip Hop"> Hip Hop</label>
+        <label class="genre-check"><input type="checkbox" value="Jazz"> Jazz</label>
+        <label class="genre-check"><input type="checkbox" value="Latin"> Latin</label>
+        <label class="genre-check"><input type="checkbox" value="Non-Music"> Non-Music</label>
+        <label class="genre-check"><input type="checkbox" value="Pop"> Pop</label>
+        <label class="genre-check"><input type="checkbox" value="Reggae"> Reggae</label>
+        <label class="genre-check"><input type="checkbox" value="Rock"> Rock</label>
+        <label class="genre-check"><input type="checkbox" value="Stage &amp; Screen"> Stage &amp; Screen</label>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Año</label>
+      <div class="year-range">
+        <input type="number" id="yearFrom" value="1960" min="1900" max="2024">
+        <span>—</span>
+        <input type="number" id="yearTo" value="2010" min="1900" max="2024">
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Excluir estilos</label>
+      <input type="text" id="excludeInput" placeholder="ej: Heavy Metal, Punk…" onkeydown="handleExcludeKey(event)">
+      <div id="excludeTags"></div>
+    </div>
+  </div>
+
+  <button id="mainBtn" onclick="getRandomTrack()">Canción Random</button>
+
+  <div id="card">
+    <img id="cover" src="" alt="Portada" style="display:none">
+    <div id="cover-placeholder" style="display:none">Sin portada</div>
+    <div id="artist"></div>
+    <div id="album"></div>
+    <div id="track"></div>
+    <div class="links">
+      <a id="link-discogs" href="#" target="_blank">Ver en Discogs</a>
+      <a id="link-youtube" href="#" target="_blank">Buscar en YouTube</a>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <script>
+    // ── Background vinyl store photos (Unsplash) ───
+    let bgActive = 'a';
+
+    function loadBg() {
+      const keywords = 'vinyl,record+store,record+shop,music+store';
+      const url = `https://source.unsplash.com/1920x1080/?${keywords}&t=${Date.now()}`;
+      const next = bgActive === 'a' ? 'b' : 'a';
+      const nextEl = document.getElementById(`bg-${next}`);
+      const currEl = document.getElementById(`bg-${bgActive}`);
+
+      const img = new Image();
+      img.onload = () => {
+        nextEl.style.backgroundImage = `url(${img.src})`;
+        nextEl.style.opacity = '1';
+        currEl.style.opacity = '0';
+        bgActive = next;
+      };
+      img.src = url;
+    }
+
+    loadBg(); // al cargar la página
+
+    // ── Exclusion tags ──────────────────────────────
+    const excludedTerms = [];
+
+    function handleExcludeKey(e) {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = e.target.value.trim().replace(/,$/, '');
+        if (val) addExclusion(val);
+        e.target.value = '';
+      }
+    }
+
+    function addExclusion(term) {
+      const normalized = term.toLowerCase();
+      if (excludedTerms.includes(normalized)) return;
+      excludedTerms.push(normalized);
+      renderTags();
+    }
+
+    function removeExclusion(term) {
+      const i = excludedTerms.indexOf(term);
+      if (i !== -1) excludedTerms.splice(i, 1);
+      renderTags();
+    }
+
+    function renderTags() {
+      const container = document.getElementById('excludeTags');
+      container.innerHTML = excludedTerms.map(t =>
+        `<div class="tag">${t}<button onclick="removeExclusion('${t.replace(/'/g, "\\'")}')" title="Quitar">×</button></div>`
+      ).join('');
+    }
+
+    function isExcluded(release) {
+      if (excludedTerms.length === 0) return false;
+      const fields = [
+        ...(release.genre  || []),
+        ...(release.style  || []),
+        ...(release.styles || []),
+      ].map(s => s.toLowerCase());
+      return excludedTerms.some(term => fields.some(f => f.includes(term)));
+    }
+
+    // ── API ────────────────────────────────────────
+    function randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function cleanArtist(name) {
+      return name.replace(/\s*\(\d+\)$/, '');
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    async function discogsGet(url) {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'DiscogsRandomizer/1.0' }
+      });
+      if (res.status === 429) throw new Error('rate_limit');
+      if (!res.ok) throw new Error(`http_${res.status}`);
+      return res.json();
+    }
+
+    async function getRandomTrack() {
+      const btn = document.getElementById('mainBtn');
+      btn.disabled = true;
+      setStatus('Buscando...');
+      document.getElementById('card').style.display = 'none';
+      loadBg();
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const yearFrom    = parseInt(document.getElementById('yearFrom').value) || 1960;
+          const yearTo      = parseInt(document.getElementById('yearTo').value)   || 2010;
+          const checkedBoxes = [...document.querySelectorAll('#genreList input:checked')];
+          const selectedGenres = checkedBoxes.map(cb => cb.value);
+          const genre = selectedGenres.length > 0
+            ? selectedGenres[randInt(0, selectedGenres.length - 1)]
+            : '';
+          const year = randInt(Math.min(yearFrom, yearTo), Math.max(yearFrom, yearTo));
+          const page = randInt(1, 10);
+
+          let searchUrl = `https://api.discogs.com/database/search?type=release&year=${year}&page=${page}&per_page=50`;
+          if (genre) searchUrl += `&genre=${encodeURIComponent(genre)}`;
+
+          const search = await discogsGet(searchUrl);
+          let results = search.results;
+          if (!results || results.length === 0) continue;
+
+          // Aplicar exclusiones sobre los resultados de búsqueda
+          if (excludedTerms.length > 0) {
+            results = results.filter(r => !isExcluded(r));
+            if (results.length === 0) continue;
+          }
+
+          const release = results[randInt(0, results.length - 1)];
+          const detail  = await discogsGet(`https://api.discogs.com/releases/${release.id}`);
+
+          // Verificar exclusión también en el detalle (tiene más estilos)
+          if (isExcluded(detail)) continue;
+
+          let tracklist = (detail.tracklist || []).filter(
+            t => t.type_ === 'track' && t.title && t.title.trim()
+          );
+          if (tracklist.length === 0) {
+            tracklist = (detail.tracklist || []).filter(t => t.title && t.title.trim());
+          }
+          if (tracklist.length === 0) continue;
+
+          const track = tracklist[randInt(0, tracklist.length - 1)];
+
+          let imageUrl = null;
+          if (detail.images && detail.images.length > 0) {
+            imageUrl = detail.images[0].uri;
+          } else if (release.cover_image && !release.cover_image.includes('spacer')) {
+            imageUrl = release.cover_image;
+          }
+
+          let artistName = '';
+          if (detail.artists && detail.artists.length > 0) {
+            artistName = cleanArtist(detail.artists[0].name);
+          } else if (release.title && release.title.includes(' - ')) {
+            artistName = release.title.split(' - ')[0].trim();
+          }
+
+          const albumTitle  = detail.title || release.title || '';
+          const trackTitle  = track.title;
+          const discogsUrl  = `https://www.discogs.com/release/${release.id}`;
+          const ytQuery     = encodeURIComponent(`${artistName} ${albumTitle} ${trackTitle}`);
+          const youtubeUrl  = `https://www.youtube.com/results?search_query=${ytQuery}`;
+
+          document.getElementById('artist').textContent = artistName;
+          document.getElementById('album').textContent  = albumTitle;
+          document.getElementById('track').textContent  = trackTitle;
+          document.getElementById('link-discogs').href  = discogsUrl;
+          document.getElementById('link-youtube').href  = youtubeUrl;
+
+          const img         = document.getElementById('cover');
+          const placeholder = document.getElementById('cover-placeholder');
+
+          if (imageUrl) {
+            img.onload  = () => { img.style.display = 'block'; placeholder.style.display = 'none'; };
+            img.onerror = () => { img.style.display = 'none';  placeholder.style.display = 'flex'; };
+            img.src = imageUrl;
+          } else {
+            img.style.display         = 'none';
+            placeholder.style.display = 'flex';
+          }
+
+          document.getElementById('card').style.display = 'flex';
+          setStatus('');
+          btn.disabled = false;
+          return;
+
+        } catch (err) {
+          if (err.message === 'rate_limit') {
+            setStatus('Límite de API alcanzado. Espera un momento.');
+            btn.disabled = false;
+            return;
+          }
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
+
+      setStatus('Error al conectar. Intenta de nuevo.');
+      btn.disabled = false;
+    }
+  </script>
+
+</body>
+</html>

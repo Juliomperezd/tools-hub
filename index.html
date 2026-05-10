@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tools</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #777;
+      font-family: Arial, Helvetica, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── LOGIN ── */
+    #login {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    #login h1 {
+      font-size: 13px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #444;
+    }
+
+    #login input {
+      background: none;
+      border: none;
+      border-bottom: 1px solid #333;
+      color: #777;
+      font-size: 18px;
+      padding: 8px 0;
+      text-align: center;
+      outline: none;
+      width: 180px;
+      letter-spacing: 6px;
+    }
+
+    #login input::placeholder { color: #333; letter-spacing: 2px; font-size: 13px; }
+
+    #login-error {
+      font-size: 11px;
+      color: #c0392b;
+      letter-spacing: 2px;
+      height: 14px;
+    }
+
+    #login button {
+      background: none;
+      border: 1px solid #333;
+      color: #555;
+      padding: 10px 32px;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #login button:hover { border-color: #666; color: #888; }
+
+    /* ── HOME ── */
+    #home {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 60px;
+      padding: 60px 20px;
+      width: 100%;
+      max-width: 700px;
+    }
+
+    #home header {
+      text-align: center;
+    }
+
+    #home header h1 {
+      font-size: 11px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: #333;
+    }
+
+    .tools {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      width: 100%;
+    }
+
+    .tool-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 0;
+      border-bottom: 1px solid #1a1a1a;
+      text-decoration: none;
+      color: #777;
+      transition: color 0.2s;
+      gap: 20px;
+    }
+
+    .tool-card:first-child { border-top: 1px solid #1a1a1a; }
+
+    .tool-card:hover { color: #bbb; }
+
+    .tool-info { flex: 1; }
+
+    .tool-name {
+      font-size: 22px;
+      font-weight: normal;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .tool-desc {
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: #3a3a3a;
+    }
+
+    .tool-arrow {
+      font-size: 18px;
+      color: #2a2a2a;
+      transition: color 0.2s, transform 0.2s;
+    }
+
+    .tool-card:hover .tool-arrow { color: #666; transform: translateX(4px); }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="login">
+    <h1>Tools</h1>
+    <input type="password" id="pwd" placeholder="contraseña" autofocus />
+    <div id="login-error"></div>
+    <button onclick="checkPassword()">Entrar</button>
+  </div>
+
+  <!-- HOME -->
+  <div id="home">
+    <header>
+      <h1>Tools</h1>
+    </header>
+
+    <div class="tools">
+      <a class="tool-card" href="Discogs.html">
+        <div class="tool-info">
+          <div class="tool-name">Discogs</div>
+          <div class="tool-desc">Random de colección — descubre tu próxima escucha</div>
+        </div>
+        <span class="tool-arrow">→</span>
+      </a>
+
+      <a class="tool-card" href="Artist.html">
+        <div class="tool-info">
+          <div class="tool-name">Artist</div>
+          <div class="tool-desc">Randomizador de artistas — elige uno al azar</div>
+        </div>
+        <span class="tool-arrow">→</span>
+      </a>
+
+      <a class="tool-card" href="Idea.html">
+        <div class="tool-info">
+          <div class="tool-name">Idea</div>
+          <div class="tool-desc">Randomizador creativo — punto de partida para producir</div>
+        </div>
+        <span class="tool-arrow">→</span>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('pwd').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') checkPassword();
+    });
+
+    function checkPassword() {
+      const val = document.getElementById('pwd').value;
+      if (val === 'julini') {
+        document.getElementById('login').style.display = 'none';
+        const home = document.getElementById('home');
+        home.style.display = 'flex';
+      } else {
+        document.getElementById('login-error').textContent = 'contraseña incorrecta';
+        document.getElementById('pwd').value = '';
+        document.getElementById('pwd').focus();
+      }
+    }
+  </script>
+
+</body>
+</html>
