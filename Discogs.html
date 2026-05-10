@@ -2,304 +2,438 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Discogs Random</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;1,300;1,400&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      min-height: 100%;
-      background: #111;
-      font-family: Arial, Helvetica, sans-serif;
+    :root {
+      --bg: #0e0e0e;
+      --surface: #161616;
+      --border: #222;
+      --muted: #333;
+      --dim: #555;
+      --mid: #777;
+      --light: #aaa;
+      --white: #e8e8e8;
     }
 
-    /* Background photo */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { height: 100%; }
+
+    body {
+      background: var(--bg);
+      font-family: 'IBM Plex Mono', monospace;
+      min-height: 100%;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background ── */
     #bg-a, #bg-b {
       position: fixed;
       inset: 0;
       background-size: cover;
       background-position: center;
-      transition: opacity 1.2s ease;
-      z-index: -2;
+      transition: opacity 1.4s ease;
+      z-index: 0;
     }
 
     #bg-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.72);
-      z-index: -1;
+      background: linear-gradient(to bottom, rgba(14,14,14,0.82) 0%, rgba(14,14,14,0.92) 100%);
+      z-index: 1;
     }
 
-    body {
+    /* ── Layout ── */
+    .page {
+      position: relative;
+      z-index: 2;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 20px;
+      padding-bottom: 60px;
+      padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    }
+
+    /* ── Top bar ── */
+    .topbar {
       display: flex;
-      flex-direction: column;
-      justify-content: center;
       align-items: center;
-      padding: 40px 20px;
-      box-sizing: border-box;
+      justify-content: space-between;
+      padding: 20px 0 24px;
+      padding-top: calc(20px + env(safe-area-inset-top));
     }
 
-    button#mainBtn {
-      background: none;
-      border: 2px solid #777;
-      color: #777;
-      padding: 14px 28px;
-      font-size: 16px;
-      cursor: pointer;
-      margin-bottom: 40px;
-      letter-spacing: 1px;
-    }
-
-    button#mainBtn:hover:not(:disabled) {
-      background: #777;
-      color: #000;
-    }
-
-    button#mainBtn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    #filters {
+    .back-btn {
       display: flex;
-      gap: 16px;
-      align-items: flex-start;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
-      justify-content: center;
-      max-width: 700px;
-      width: 100%;
-    }
-
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .filter-group label {
-      color: #555;
+      align-items: center;
+      gap: 8px;
+      color: var(--dim);
+      text-decoration: none;
       font-size: 11px;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
       text-transform: uppercase;
+      transition: color 0.2s;
+      padding: 8px 0;
     }
 
-    .filter-group input[type="number"],
-    .filter-group input[type="text"] {
+    .back-btn:hover { color: var(--mid); }
+
+    .back-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .page-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── Filters accordion ── */
+    .filters-toggle {
+      width: 100%;
       background: none;
-      border: 1px solid #333;
-      color: #777;
-      padding: 7px 10px;
-      font-size: 14px;
-      font-family: Arial, Helvetica, sans-serif;
-      box-sizing: border-box;
-      appearance: none;
-      -webkit-appearance: none;
-    }
-
-    .filter-group input[type="number"] {
-      width: 80px;
-    }
-
-    .filter-group input[type="text"] {
-      width: 220px;
-    }
-
-    .filter-group input[type="text"]::placeholder {
-      color: #444;
-    }
-
-    /* Genre checkboxes */
-    #genreList {
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 0 16px;
+      height: 44px;
       display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      margin-bottom: 2px;
+    }
+
+    .filters-toggle:hover { border-color: var(--muted); color: var(--mid); }
+
+    .filters-toggle .arrow {
+      font-size: 16px;
+      transition: transform 0.25s ease;
+      display: inline-block;
+    }
+
+    .filters-toggle.open .arrow { transform: rotate(180deg); }
+
+    .filters-body {
+      display: none;
       flex-direction: column;
-      gap: 5px;
-      max-height: 220px;
-      overflow-y: auto;
-      padding-right: 4px;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-top: none;
+      margin-bottom: 24px;
+      overflow: hidden;
     }
 
-    #genreList::-webkit-scrollbar {
-      width: 4px;
+    .filters-body.open { display: flex; }
+
+    .filter-section {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--border);
     }
 
-    #genreList::-webkit-scrollbar-track {
-      background: #1a1a1a;
+    .filter-section:last-child { border-bottom: none; }
+
+    .filter-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: block;
     }
 
-    #genreList::-webkit-scrollbar-thumb {
-      background: #333;
+    /* Genre grid */
+    .genre-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
     }
 
     .genre-check {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       cursor: pointer;
-      color: #666;
-      font-size: 13px;
+      color: var(--dim);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      min-height: 40px;
+      padding: 4px 0;
       user-select: none;
+      transition: color 0.15s;
     }
 
-    .genre-check:hover {
-      color: #999;
-    }
+    .genre-check:hover { color: var(--mid); }
 
     .genre-check input[type="checkbox"] {
       appearance: none;
       -webkit-appearance: none;
-      width: 13px;
-      height: 13px;
-      border: 1px solid #444;
+      width: 18px;
+      height: 18px;
+      border: 1px solid var(--muted);
       background: none;
       cursor: pointer;
       flex-shrink: 0;
       position: relative;
+      transition: border-color 0.15s, background 0.15s;
     }
 
     .genre-check input[type="checkbox"]:checked {
-      border-color: #777;
-      background: #777;
+      border-color: var(--mid);
+      background: var(--mid);
     }
 
     .genre-check input[type="checkbox"]:checked::after {
       content: '';
       position: absolute;
-      left: 2px;
-      top: 0px;
-      width: 4px;
-      height: 7px;
-      border: 2px solid #111;
+      left: 4px;
+      top: 1px;
+      width: 5px;
+      height: 9px;
+      border: 2px solid #0e0e0e;
       border-top: none;
       border-left: none;
       transform: rotate(45deg);
     }
 
-    .year-range {
+    /* Year range */
+    .year-row {
       display: flex;
-      gap: 8px;
+      gap: 12px;
       align-items: center;
     }
 
-    .year-range span {
-      color: #333;
-      font-size: 12px;
+    .year-input-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
-    /* Exclusion tags */
+    .year-sub {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .year-input-wrap input[type="number"] {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--light);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 16px;
+      padding: 12px 12px;
+      text-align: center;
+      appearance: none;
+      -webkit-appearance: none;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .year-input-wrap input[type="number"]:focus { border-color: var(--muted); }
+
+    .year-dash {
+      color: var(--muted);
+      font-size: 16px;
+      padding-top: 22px;
+      flex-shrink: 0;
+    }
+
+    /* Exclude */
+    .exclude-input {
+      width: 100%;
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      color: var(--mid);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      padding: 10px 0;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .exclude-input:focus { border-color: var(--dim); }
+    .exclude-input::placeholder { color: var(--muted); }
+
     #excludeTags {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: 6px;
-      max-width: 220px;
+      margin-top: 12px;
     }
 
     .tag {
-      background: #1e1e1e;
-      border: 1px solid #333;
-      color: #666;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 11px;
-      padding: 3px 8px;
+      padding: 4px 10px;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
     }
 
     .tag button {
       background: none;
       border: none;
-      color: #555;
+      color: var(--muted);
       cursor: pointer;
-      font-size: 13px;
+      font-size: 15px;
       padding: 0;
       line-height: 1;
-      margin: 0;
+      transition: color 0.15s;
     }
 
-    .tag button:hover {
-      color: #999;
+    .tag button:hover { color: var(--mid); }
+
+    /* ── Main button ── */
+    #mainBtn {
+      width: 100%;
+      height: 56px;
       background: none;
+      border: 1px solid var(--mid);
+      color: var(--mid);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      margin-bottom: 32px;
     }
 
-    /* card */
+    #mainBtn:hover:not(:disabled) {
+      background: var(--mid);
+      color: #0e0e0e;
+    }
+
+    #mainBtn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* ── Status ── */
+    #status {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--dim);
+      text-align: center;
+      min-height: 20px;
+      margin-bottom: 24px;
+    }
+
+    /* ── Card ── */
     #card {
       display: none;
       flex-direction: column;
       align-items: center;
-      text-align: center;
-      max-width: 400px;
-      width: 100%;
+      animation: fadeUp 0.4s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     #cover {
-      width: 240px;
-      height: 240px;
+      width: 100%;
+      max-width: 340px;
+      aspect-ratio: 1;
       object-fit: cover;
-      margin-bottom: 24px;
+      margin-bottom: 28px;
+      display: none;
     }
 
     #cover-placeholder {
-      width: 240px;
-      height: 240px;
-      background: #222;
-      display: flex;
+      width: 100%;
+      max-width: 340px;
+      aspect-ratio: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: none;
       align-items: center;
       justify-content: center;
-      margin-bottom: 24px;
-      color: #444;
-      font-size: 14px;
-    }
-
-    #artist {
-      color: #888;
-      font-size: 13px;
+      color: var(--muted);
+      font-size: 11px;
       letter-spacing: 2px;
       text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-
-    #album {
-      color: #555;
-      font-size: 16px;
-      font-style: italic;
-      margin-bottom: 20px;
-    }
-
-    #track {
-      color: #ddd;
-      font-size: 48px;
-      font-weight: bold;
-      line-height: 1.1;
       margin-bottom: 28px;
     }
 
-    .links {
-      display: flex;
-      gap: 12px;
+    .card-meta {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    #artist {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 6px;
+    }
+
+    #album {
+      font-family: 'Cormorant', serif;
+      font-style: italic;
+      font-size: 16px;
+      color: var(--dim);
+      margin-bottom: 24px;
+    }
+
+    #track {
+      font-family: 'Cormorant', serif;
+      font-weight: 300;
+      font-size: clamp(36px, 11vw, 56px);
+      line-height: 1.1;
+      color: var(--white);
+      text-align: center;
+      width: 100%;
       margin-bottom: 32px;
     }
 
+    /* ── Links ── */
+    .links {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
     .links a {
+      flex: 1;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: none;
-      border: 1px solid #555;
-      color: #777;
-      padding: 6px 14px;
-      font-size: 12px;
+      border: 1px solid var(--border);
+      color: var(--dim);
       text-decoration: none;
-      letter-spacing: 1px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
     }
 
     .links a:hover {
-      background: #555;
-      color: #000;
-    }
-
-    #status {
-      color: #555;
-      font-size: 13px;
-      margin-top: 8px;
-      min-height: 18px;
+      border-color: var(--dim);
+      color: var(--mid);
     }
   </style>
 </head>
@@ -309,61 +443,102 @@
   <div id="bg-b"></div>
   <div id="bg-overlay"></div>
 
-  <div id="filters">
-    <div class="filter-group">
-      <label>Género (vacío = todos)</label>
-      <div id="genreList">
-        <label class="genre-check"><input type="checkbox" value="Blues"> Blues</label>
-        <label class="genre-check"><input type="checkbox" value="Brass &amp; Military"> Brass &amp; Military</label>
-        <label class="genre-check"><input type="checkbox" value="Children's"> Children's</label>
-        <label class="genre-check"><input type="checkbox" value="Classical"> Classical</label>
-        <label class="genre-check"><input type="checkbox" value="Electronic"> Electronic</label>
-        <label class="genre-check"><input type="checkbox" value="Folk, World, &amp; Country"> Folk, World, &amp; Country</label>
-        <label class="genre-check"><input type="checkbox" value="Funk / Soul"> Funk / Soul</label>
-        <label class="genre-check"><input type="checkbox" value="Hip Hop"> Hip Hop</label>
-        <label class="genre-check"><input type="checkbox" value="Jazz"> Jazz</label>
-        <label class="genre-check"><input type="checkbox" value="Latin"> Latin</label>
-        <label class="genre-check"><input type="checkbox" value="Non-Music"> Non-Music</label>
-        <label class="genre-check"><input type="checkbox" value="Pop"> Pop</label>
-        <label class="genre-check"><input type="checkbox" value="Reggae"> Reggae</label>
-        <label class="genre-check"><input type="checkbox" value="Rock"> Rock</label>
-        <label class="genre-check"><input type="checkbox" value="Stage &amp; Screen"> Stage &amp; Screen</label>
+  <div class="page">
+    <!-- Top bar -->
+    <div class="topbar">
+      <a class="back-btn" href="index.html">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 2L4 7l5 5"/>
+        </svg>
+        Volver
+      </a>
+      <span class="page-title">Discogs</span>
+    </div>
+
+    <!-- Filters -->
+    <button class="filters-toggle" id="filtersToggle" onclick="toggleFilters()">
+      <span>Filtros</span>
+      <span class="arrow">▾</span>
+    </button>
+
+    <div class="filters-body" id="filtersBody">
+
+      <div class="filter-section">
+        <span class="filter-label">Género</span>
+        <div class="genre-grid" id="genreList">
+          <label class="genre-check"><input type="checkbox" value="Blues"> Blues</label>
+          <label class="genre-check"><input type="checkbox" value="Classical"> Classical</label>
+          <label class="genre-check"><input type="checkbox" value="Electronic"> Electronic</label>
+          <label class="genre-check"><input type="checkbox" value="Folk, World, &amp; Country"> Folk &amp; World</label>
+          <label class="genre-check"><input type="checkbox" value="Funk / Soul"> Funk / Soul</label>
+          <label class="genre-check"><input type="checkbox" value="Hip Hop"> Hip Hop</label>
+          <label class="genre-check"><input type="checkbox" value="Jazz"> Jazz</label>
+          <label class="genre-check"><input type="checkbox" value="Latin"> Latin</label>
+          <label class="genre-check"><input type="checkbox" value="Pop"> Pop</label>
+          <label class="genre-check"><input type="checkbox" value="Reggae"> Reggae</label>
+          <label class="genre-check"><input type="checkbox" value="Rock"> Rock</label>
+          <label class="genre-check"><input type="checkbox" value="Brass &amp; Military"> Brass</label>
+          <label class="genre-check"><input type="checkbox" value="Stage &amp; Screen"> Stage</label>
+          <label class="genre-check"><input type="checkbox" value="Non-Music"> Non-Music</label>
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Año</span>
+        <div class="year-row">
+          <div class="year-input-wrap">
+            <span class="year-sub">Desde</span>
+            <input type="number" id="yearFrom" value="1960" min="1900" max="2024">
+          </div>
+          <span class="year-dash">—</span>
+          <div class="year-input-wrap">
+            <span class="year-sub">Hasta</span>
+            <input type="number" id="yearTo" value="2010" min="1900" max="2024">
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Excluir estilos</span>
+        <input type="text" class="exclude-input" id="excludeInput"
+               placeholder="Heavy Metal, Punk…"
+               onkeydown="handleExcludeKey(event)">
+        <div id="excludeTags"></div>
+      </div>
+
+    </div>
+
+    <!-- Main button -->
+    <button id="mainBtn" onclick="getRandomTrack()">Random</button>
+
+    <!-- Status -->
+    <div id="status"></div>
+
+    <!-- Card -->
+    <div id="card">
+      <img id="cover" src="" alt="Portada">
+      <div id="cover-placeholder">Sin portada</div>
+      <div class="card-meta">
+        <div id="artist"></div>
+        <div id="album"></div>
+      </div>
+      <div id="track"></div>
+      <div class="links">
+        <a id="link-discogs" href="#" target="_blank">Discogs</a>
+        <a id="link-youtube" href="#" target="_blank">YouTube</a>
       </div>
     </div>
-
-    <div class="filter-group">
-      <label>Año</label>
-      <div class="year-range">
-        <input type="number" id="yearFrom" value="1960" min="1900" max="2024">
-        <span>—</span>
-        <input type="number" id="yearTo" value="2010" min="1900" max="2024">
-      </div>
-    </div>
-
-    <div class="filter-group">
-      <label>Excluir estilos</label>
-      <input type="text" id="excludeInput" placeholder="ej: Heavy Metal, Punk…" onkeydown="handleExcludeKey(event)">
-      <div id="excludeTags"></div>
-    </div>
   </div>
-
-  <button id="mainBtn" onclick="getRandomTrack()">Canción Random</button>
-
-  <div id="card">
-    <img id="cover" src="" alt="Portada" style="display:none">
-    <div id="cover-placeholder" style="display:none">Sin portada</div>
-    <div id="artist"></div>
-    <div id="album"></div>
-    <div id="track"></div>
-    <div class="links">
-      <a id="link-discogs" href="#" target="_blank">Ver en Discogs</a>
-      <a id="link-youtube" href="#" target="_blank">Buscar en YouTube</a>
-    </div>
-  </div>
-
-  <div id="status"></div>
 
   <script>
+    // ── Filters toggle ──────────────────────────────
+    function toggleFilters() {
+      const btn  = document.getElementById('filtersToggle');
+      const body = document.getElementById('filtersBody');
+      const open = body.classList.toggle('open');
+      btn.classList.toggle('open', open);
+    }
+
     // ── Background vinyl store photos (Unsplash) ───
     let bgActive = 'a';
 
@@ -384,7 +559,7 @@
       img.src = url;
     }
 
-    loadBg(); // al cargar la página
+    loadBg();
 
     // ── Exclusion tags ──────────────────────────────
     const excludedTerms = [];
@@ -414,7 +589,7 @@
     function renderTags() {
       const container = document.getElementById('excludeTags');
       container.innerHTML = excludedTerms.map(t =>
-        `<div class="tag">${t}<button onclick="removeExclusion('${t.replace(/'/g, "\\'")}')" title="Quitar">×</button></div>`
+        `<div class="tag">${t}<button onclick="removeExclusion('${t.replace(/'/g, "\\'")}')">×</button></div>`
       ).join('');
     }
 
@@ -428,7 +603,7 @@
       return excludedTerms.some(term => fields.some(f => f.includes(term)));
     }
 
-    // ── API ────────────────────────────────────────
+    // ── API ─────────────────────────────────────────
     function randInt(min, max) {
       return Math.floor(Math.random() * (max - min + 1)) + min;
     }
@@ -453,15 +628,15 @@
     async function getRandomTrack() {
       const btn = document.getElementById('mainBtn');
       btn.disabled = true;
-      setStatus('Buscando...');
+      setStatus('Buscando…');
       document.getElementById('card').style.display = 'none';
       loadBg();
 
       for (let attempt = 0; attempt < 5; attempt++) {
         try {
-          const yearFrom    = parseInt(document.getElementById('yearFrom').value) || 1960;
-          const yearTo      = parseInt(document.getElementById('yearTo').value)   || 2010;
-          const checkedBoxes = [...document.querySelectorAll('#genreList input:checked')];
+          const yearFrom      = parseInt(document.getElementById('yearFrom').value) || 1960;
+          const yearTo        = parseInt(document.getElementById('yearTo').value)   || 2010;
+          const checkedBoxes  = [...document.querySelectorAll('#genreList input:checked')];
           const selectedGenres = checkedBoxes.map(cb => cb.value);
           const genre = selectedGenres.length > 0
             ? selectedGenres[randInt(0, selectedGenres.length - 1)]
@@ -476,7 +651,6 @@
           let results = search.results;
           if (!results || results.length === 0) continue;
 
-          // Aplicar exclusiones sobre los resultados de búsqueda
           if (excludedTerms.length > 0) {
             results = results.filter(r => !isExcluded(r));
             if (results.length === 0) continue;
@@ -485,7 +659,6 @@
           const release = results[randInt(0, results.length - 1)];
           const detail  = await discogsGet(`https://api.discogs.com/releases/${release.id}`);
 
-          // Verificar exclusión también en el detalle (tiene más estilos)
           if (isExcluded(detail)) continue;
 
           let tracklist = (detail.tracklist || []).filter(
@@ -512,11 +685,11 @@
             artistName = release.title.split(' - ')[0].trim();
           }
 
-          const albumTitle  = detail.title || release.title || '';
-          const trackTitle  = track.title;
-          const discogsUrl  = `https://www.discogs.com/release/${release.id}`;
-          const ytQuery     = encodeURIComponent(`${artistName} ${albumTitle} ${trackTitle}`);
-          const youtubeUrl  = `https://www.youtube.com/results?search_query=${ytQuery}`;
+          const albumTitle = detail.title || release.title || '';
+          const trackTitle = track.title;
+          const discogsUrl = `https://www.discogs.com/release/${release.id}`;
+          const ytQuery    = encodeURIComponent(`${artistName} ${albumTitle} ${trackTitle}`);
+          const youtubeUrl = `https://www.youtube.com/results?search_query=${ytQuery}`;
 
           document.getElementById('artist').textContent = artistName;
           document.getElementById('album').textContent  = albumTitle;
@@ -543,7 +716,7 @@
 
         } catch (err) {
           if (err.message === 'rate_limit') {
-            setStatus('Límite de API alcanzado. Espera un momento.');
+            setStatus('Límite de API. Espera un momento.');
             btn.disabled = false;
             return;
           }
