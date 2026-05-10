@@ -17,60 +17,9 @@
       justify-content: center;
     }
 
-    /* ── LOGIN ── */
-    #login {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
-    }
-
-    #login h1 {
-      font-size: 13px;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: #444;
-    }
-
-    #login input {
-      background: none;
-      border: none;
-      border-bottom: 1px solid #333;
-      color: #777;
-      font-size: 18px;
-      padding: 8px 0;
-      text-align: center;
-      outline: none;
-      width: 180px;
-      letter-spacing: 6px;
-    }
-
-    #login input::placeholder { color: #333; letter-spacing: 2px; font-size: 13px; }
-
-    #login-error {
-      font-size: 11px;
-      color: #c0392b;
-      letter-spacing: 2px;
-      height: 14px;
-    }
-
-    #login button {
-      background: none;
-      border: 1px solid #333;
-      color: #555;
-      padding: 10px 32px;
-      font-size: 12px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    #login button:hover { border-color: #666; color: #888; }
-
     /* ── HOME ── */
     #home {
-      display: none;
+      display: flex;
       flex-direction: column;
       align-items: center;
       gap: 60px;
@@ -139,15 +88,6 @@
 </head>
 <body>
 
-  <!-- LOGIN -->
-  <div id="login">
-    <h1>Tools</h1>
-    <input type="password" id="pwd" placeholder="contraseña" autofocus />
-    <div id="login-error"></div>
-    <button onclick="checkPassword()">Entrar</button>
-  </div>
-
-  <!-- HOME -->
   <div id="home">
     <header>
       <h1>Tools</h1>
@@ -180,24 +120,6 @@
     </div>
   </div>
 
-  <script>
-    document.getElementById('pwd').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') checkPassword();
-    });
-
-    function checkPassword() {
-      const val = document.getElementById('pwd').value;
-      if (val === 'julini') {
-        document.getElementById('login').style.display = 'none';
-        const home = document.getElementById('home');
-        home.style.display = 'flex';
-      } else {
-        document.getElementById('login-error').textContent = 'contraseña incorrecta';
-        document.getElementById('pwd').value = '';
-        document.getElementById('pwd').focus();
-      }
-    }
-  </script>
 
 </body>
 </html>
