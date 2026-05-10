@@ -407,6 +407,15 @@
       margin-bottom: 32px;
     }
 
+    /* ── Styles ── */
+    #stylesSection { display: none; }
+
+    .style-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+    }
+
     /* ── Presets ── */
     .presets-row {
       display: flex;
@@ -526,6 +535,11 @@
         </div>
       </div>
 
+      <div class="filter-section" id="stylesSection">
+        <span class="filter-label">Estilo (vacío = todos)</span>
+        <div class="style-grid" id="styleList"></div>
+      </div>
+
       <div class="filter-section">
         <span class="filter-label">Año</span>
         <div class="year-row">
@@ -574,6 +588,75 @@
   </div>
 
   <script>
+    // ── Styles ──────────────────────────────────────
+    const GENRE_STYLES = {
+      'Electronic': [
+        'Ambient','Bass Music','Breaks','Breakbeat','Deep House','Disco','Downtempo',
+        'Drum n Bass','Dub Techno','Electro','EBM','Experimental','Footwork',
+        'Grime','House','IDM','Industrial','Jungle','Minimal','Noise',
+        'Synth-pop','Tech House','Techno','Trance','Trip Hop','UK Garage'
+      ],
+      'Jazz': [
+        'Bebop','Bossa Nova','Cool Jazz','Free Jazz','Fusion',
+        'Hard Bop','Jazz-Funk','Modal','Soul Jazz','Swing','Avant-garde Jazz'
+      ],
+      'Funk / Soul': [
+        'Disco','Funk','Gospel','Neo Soul','R&B','Rare Groove','Soul','P.Funk'
+      ],
+      'Hip Hop': [
+        'Abstract','Boom Bap','Conscious','Crunk','Gangsta','Grime',
+        'Instrumental','Jazz-Rap','Lo-Fi','Trap','Trip Hop'
+      ],
+      'Rock': [
+        'Alternative Rock','Art Rock','Folk Rock','Indie Rock','Krautrock',
+        'Noise Rock','Post-Rock','Prog Rock','Psych Rock','Shoegaze','Soft Rock','Surf'
+      ],
+      'Classical': [
+        'Baroque','Chamber Music','Contemporary','Impressionist',
+        'Modern','Orchestral','Romantic','Symphonic'
+      ],
+      'Folk, World, & Country': [
+        'African','Afrobeat','Brazilian','Celtic','Cumbia','Folk',
+        'Latin','Reggae','Samba','World','Bossa Nova'
+      ],
+      'Blues': [
+        'Chicago Blues','Country Blues','Delta Blues','Electric Blues','Rhythm & Blues'
+      ],
+      'Latin': [
+        'Bossa Nova','Cumbia','Latin Jazz','Mambo','Salsa','Samba','Son','Tango'
+      ],
+      'Reggae': [
+        'Dancehall','Dub','Lovers Rock','Roots Reggae','Ska','Rocksteady'
+      ],
+    };
+
+    function renderStyles() {
+      const checked = [...document.querySelectorAll('#genreList input:checked')].map(cb => cb.value);
+      const section = document.getElementById('stylesSection');
+      const list    = document.getElementById('styleList');
+
+      if (checked.length === 0) {
+        section.style.display = 'none';
+        list.innerHTML = '';
+        return;
+      }
+
+      const styles = [...new Set(checked.flatMap(g => GENRE_STYLES[g] || []))].sort();
+      section.style.display = 'block';
+
+      const prevChecked = new Set(
+        [...document.querySelectorAll('#styleList input:checked')].map(cb => cb.value)
+      );
+
+      list.innerHTML = styles.map(s => `
+        <label class="genre-check">
+          <input type="checkbox" value="${s}"${prevChecked.has(s) ? ' checked' : ''}> ${s}
+        </label>
+      `).join('');
+    }
+
+    document.getElementById('genreList').addEventListener('change', renderStyles);
+
     // ── Presets ─────────────────────────────────────
     const PRESETS = [
       { id: 'todo',       label: 'Todo',        genres: [],                  yearFrom: 1960, yearTo: 2024, exclude: [] },
@@ -616,6 +699,7 @@
       preset.exclude.forEach(t => excludedTerms.push(t));
       renderTags();
 
+      renderStyles();
       renderPresets();
     }
 
@@ -630,7 +714,7 @@
 
     // Deselect preset when user manually changes filters
     document.addEventListener('change', function(e) {
-      if (e.target.closest('#genreList, #yearFrom, #yearTo')) clearActivePreset();
+      if (e.target.closest('#genreList, #styleList, #yearFrom, #yearTo')) clearActivePreset();
     });
 
     // ── Filters toggle ──────────────────────────────
@@ -738,16 +822,20 @@
         try {
           const yearFrom      = parseInt(document.getElementById('yearFrom').value) || 1960;
           const yearTo        = parseInt(document.getElementById('yearTo').value)   || 2010;
-          const checkedBoxes  = [...document.querySelectorAll('#genreList input:checked')];
-          const selectedGenres = checkedBoxes.map(cb => cb.value);
-          const genre = selectedGenres.length > 0
-            ? selectedGenres[randInt(0, selectedGenres.length - 1)]
+          const checkedGenres  = [...document.querySelectorAll('#genreList input:checked')].map(cb => cb.value);
+          const checkedStyles  = [...document.querySelectorAll('#styleList input:checked')].map(cb => cb.value);
+          const genre = checkedGenres.length > 0
+            ? checkedGenres[randInt(0, checkedGenres.length - 1)]
+            : '';
+          const style = checkedStyles.length > 0
+            ? checkedStyles[randInt(0, checkedStyles.length - 1)]
             : '';
           const year = randInt(Math.min(yearFrom, yearTo), Math.max(yearFrom, yearTo));
           const page = randInt(1, 10);
 
           let searchUrl = `https://api.discogs.com/database/search?type=release&year=${year}&page=${page}&per_page=50`;
           if (genre) searchUrl += `&genre=${encodeURIComponent(genre)}`;
+          if (style) searchUrl += `&style=${encodeURIComponent(style)}`;
 
           const search = await discogsGet(searchUrl);
           let results = search.results;
