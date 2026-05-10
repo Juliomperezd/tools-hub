@@ -407,6 +407,46 @@
       margin-bottom: 32px;
     }
 
+    /* ── Presets ── */
+    .presets-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 16px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .presets-row::-webkit-scrollbar { display: none; }
+
+    .preset-chip {
+      flex-shrink: 0;
+      height: 36px;
+      padding: 0 14px;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+
+    .preset-chip:hover {
+      border-color: var(--dim);
+      color: var(--dim);
+    }
+
+    .preset-chip.active {
+      border-color: var(--mid);
+      color: var(--mid);
+      background: rgba(119,119,119,0.08);
+    }
+
     /* ── Links ── */
     .links {
       display: flex;
@@ -454,6 +494,9 @@
       </a>
       <span class="page-title">Discogs</span>
     </div>
+
+    <!-- Presets -->
+    <div class="presets-row" id="presetsRow"></div>
 
     <!-- Filters -->
     <button class="filters-toggle" id="filtersToggle" onclick="toggleFilters()">
@@ -531,6 +574,65 @@
   </div>
 
   <script>
+    // ── Presets ─────────────────────────────────────
+    const PRESETS = [
+      { id: 'todo',       label: 'Todo',        genres: [],                  yearFrom: 1960, yearTo: 2024, exclude: [] },
+      { id: 'electronica',label: 'Electrónica', genres: ['Electronic'],      yearFrom: 1985, yearTo: 2024, exclude: [] },
+      { id: 'hiphop',     label: 'Hip Hop',     genres: ['Hip Hop'],         yearFrom: 1988, yearTo: 2015, exclude: [] },
+      { id: 'indie',      label: 'Indie / Alt', genres: ['Rock', 'Pop'],     yearFrom: 1990, yearTo: 2015, exclude: ['heavy metal', 'punk', 'hard rock', 'metal'] },
+      { id: 'jazz',       label: 'Jazz',        genres: ['Jazz'],            yearFrom: 1950, yearTo: 1980, exclude: [] },
+      { id: 'soul',       label: 'Soul & Funk', genres: ['Funk / Soul'],     yearFrom: 1960, yearTo: 1985, exclude: [] },
+    ];
+
+    let activePreset = null;
+
+    function renderPresets() {
+      const row = document.getElementById('presetsRow');
+      row.innerHTML = PRESETS.map(p => `
+        <button class="preset-chip${activePreset === p.id ? ' active' : ''}"
+                onclick="applyPreset('${p.id}')">
+          ${p.label}
+        </button>
+      `).join('');
+    }
+
+    function applyPreset(id) {
+      const preset = PRESETS.find(p => p.id === id);
+      if (!preset) return;
+
+      activePreset = id;
+
+      // Genres
+      document.querySelectorAll('#genreList input[type="checkbox"]').forEach(cb => {
+        cb.checked = preset.genres.includes(cb.value);
+      });
+
+      // Years
+      document.getElementById('yearFrom').value = preset.yearFrom;
+      document.getElementById('yearTo').value   = preset.yearTo;
+
+      // Exclusions
+      excludedTerms.length = 0;
+      preset.exclude.forEach(t => excludedTerms.push(t));
+      renderTags();
+
+      renderPresets();
+    }
+
+    function clearActivePreset() {
+      if (activePreset !== null) {
+        activePreset = null;
+        renderPresets();
+      }
+    }
+
+    renderPresets();
+
+    // Deselect preset when user manually changes filters
+    document.addEventListener('change', function(e) {
+      if (e.target.closest('#genreList, #yearFrom, #yearTo')) clearActivePreset();
+    });
+
     // ── Filters toggle ──────────────────────────────
     function toggleFilters() {
       const btn  = document.getElementById('filtersToggle');
