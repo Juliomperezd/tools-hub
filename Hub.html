@@ -126,6 +126,23 @@
       font-family: inherit;
       white-space: nowrap;
     }
+    /* ── Aviso de guardado ── */
+    #toast {
+      position: fixed; bottom: 22px; right: 22px; z-index: 9999;
+      display: flex; align-items: center; gap: 9px;
+      background: #161616; border: 1px solid #2e2e2e; border-radius: 6px;
+      padding: 11px 15px; font-size: 12px; color: #ccc;
+      box-shadow: 0 8px 28px rgba(0,0,0,.5);
+      opacity: 0; transform: translateY(8px); pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast-dot { width: 7px; height: 7px; border-radius: 50%; background: #555; flex: 0 0 auto; }
+    #toast[data-state="sync"] #toast-dot { background: #c9a227; }
+    #toast[data-state="ok"]   #toast-dot { background: #4a9960; }
+    #toast[data-state="err"]  #toast-dot { background: #b04a4a; }
+    #toast[data-state="err"]  { border-color: #5a2a2a; color: #e0b0b0; }
+
     .btn-white { background: #e8e8e8; border: 1px solid #e8e8e8; color: #0f0f0f; font-weight: 500; }
     .btn-white:hover { background: #fff; border-color: #fff; }
     .btn-outline { background: transparent; border: 1px solid #e8e8e8; color: #e8e8e8; }
@@ -711,6 +728,9 @@
 <input type="file" id="file-input" accept=".json" style="display:none">
 <input type="file" id="backup-input" accept=".json" style="display:none">
 
+<!-- Aviso de guardado: confirma que la card llegó a la base de datos, no solo al navegador -->
+<div id="toast" data-state="ok"><span id="toast-dot"></span><span id="toast-msg"></span></div>
+
 <script>
 const STORAGE_KEY = 'hub_tricks';
 const SUBCATTED = new Set(['armonia', 'ritmo', 'sound', 'bass', 'pads', 'drops', 'drums', 'melodia', 'plugins']);
@@ -795,6 +815,21 @@ const MAX_BODY     = 1500000;              // tope de bytes por request
 let _snap    = {};        // clave -> Map(id -> JSON) última versión que sabemos que está arriba
 let _flushing = false;
 let _syncErr  = null;
+let _booted   = false;    // hasta que no arranca, los guardados son semillas: no avisar
+let _toastT   = null;
+
+// Aviso visual. El estado 'ok' SOLO se lanza cuando la base de datos ha respondido
+// que aceptó las filas: si dijera "guardado" al escribir en local, volvería a pasar
+// lo de perder cards creyendo que estaban a salvo.
+function toast(msg, state = 'ok', ms = 2600) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  document.getElementById('toast-msg').textContent = msg;
+  el.dataset.state = state;
+  el.classList.add('show');
+  clearTimeout(_toastT);
+  if (ms) _toastT = setTimeout(() => el.classList.remove('show'), ms);
+}
 
 async function supaReq(path, opts = {}) {
   const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
@@ -867,6 +902,7 @@ function syncPush(key) {
 
   setPending(q);
   _snap[key] = cur;
+  if (_booted) toast('Guardando…', 'sync', 0);   // sin autocierre: lo releva el resultado real
   flushQueue();
 }
 
@@ -874,6 +910,7 @@ async function flushQueue() {
   if (_flushing || !navigator.onLine) return;
   _flushing = true;
   setSyncBadge('sync');
+  let sent = 0;
   try {
     let q = getPending();
     while (q.length) {
@@ -895,16 +932,20 @@ async function flushQueue() {
           body: JSON.stringify({ deleted: true, updated_at: stamp })
         });
       }
+      // Solo se llega aquí si Supabase devolvió 2xx: la fila está confirmada en la base.
+      sent += (op.t === 'up' ? op.rows.length : op.ids.length);
       q.shift();
       setPending(q);
     }
     _syncErr = null;
     setSyncBadge('ok');
+    if (_booted && sent) toast('Guardado en la nube ✓', 'ok');
   } catch (e) {
     // La cola se conserva: se reintenta al recuperar red o en el siguiente guardado.
     _syncErr = e.message;
     console.error('sync', e);
     setSyncBadge('err');
+    if (_booted) toast('Sin subir — guardado en este dispositivo, se reintentará', 'err', 6000);
   } finally {
     _flushing = false;
   }
@@ -3090,8 +3131,15 @@ initStorage().then(async () => {
   render();
 
   setSyncBadge(online ? 'ok' : 'off');
+  _booted = true;                  // a partir de aquí los guardados son tuyos, no semillas
+  if (getPending().length) toast('Subiendo cambios pendientes…', 'sync', 0);
   flushQueue();
   setInterval(pollRemote, 45000);
+});
+
+// Último cortafuegos: si quedan cambios sin confirmar, avisar antes de cerrar la pestaña.
+window.addEventListener('beforeunload', e => {
+  if (getPending().length) { e.preventDefault(); e.returnValue = ''; }
 });
 </script>
 </body>
