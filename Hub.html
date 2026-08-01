@@ -225,8 +225,21 @@
     .card-folder-chip img { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; flex-shrink: 0; }
     .card-folder-chip .cf-ph { width: 16px; height: 16px; border-radius: 3px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #888; flex-shrink: 0; }
     .card-folder-chip .cf-name { text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .card-folder-chip + .card-image { margin-top: 0; border-radius: 6px; }
-    .card-detail .card-folder-chip + .card-image { margin-top: 0; border-radius: 8px; }
+    .card-folder-chip { cursor: pointer; max-width: 100%; }
+    .card-folder-chip:hover .cf-name { color: #ddd; }
+    /* Varios chips (casa + referencias) en fila, con salto si no caben */
+    .card-folder-chips { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 9px; }
+    .card-folder-chips .card-folder-chip { margin-bottom: 0; }
+    .card-folder-chips + .card-image { margin-top: 0; border-radius: 6px; }
+    .card-detail .card-folder-chips + .card-image { margin-top: 0; border-radius: 8px; }
+
+    /* Referencias en el editor */
+    .edit-hint { color: #555; text-transform: none; letter-spacing: 0; font-size: 10px; }
+    .refs-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .refs-empty { font-size: 11px; color: #555; }
+    .ref-chip { display: inline-flex; align-items: center; gap: 6px; background: #1e1e1e; border: 1px solid #333; border-radius: 4px; padding: 4px 6px 4px 9px; font-size: 11px; color: #ccc; }
+    .ref-x { background: none; border: none; color: #777; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; font-family: inherit; }
+    .ref-x:hover { color: #e06666; }
     .card-title {
       font-size: 14px;
       font-weight: 600;
@@ -1096,9 +1109,41 @@ function folderById(id) { return getFolders().find(f => f.id === id) || null; }
 function childFolders(parentId, type) {
   return getFolders().filter(f => f.parentId === parentId && (!type || f.type === type));
 }
+// Una card aparece en una carpeta si es su casa (folderId) o si la referencia (refs).
+// Las referencias son el cruce: una card de armonía/examples puede asomar también
+// en el artista y en el disco sin dejar de vivir en su categoría.
 function cardsInFolder(folderId) {
-  return getTricks().filter(t => t.folderId === folderId);
+  return getTricks().filter(t => t.folderId === folderId || (t.refs || []).includes(folderId));
 }
+function getRefs(t) { return Array.isArray(t.refs) ? t.refs.filter(Boolean) : []; }
+
+// Saltar a la carpeta de un chip. Replica lo que hace el sidebar al cambiar de sección
+// (activo, título, búsqueda limpia, toolbar) y además entra dentro de la carpeta.
+function gotoFolder(id) {
+  const f = folderById(id);
+  const cat = f && CAT_FOR_FTYPE[f.type];
+  if (!cat) return;
+  closeCardModal();
+  currentCat = cat;
+  currentSubcat = defaultSubcat(cat);
+  currentFolder = f.id;
+  searchQuery = '';
+  const s = document.getElementById('search'); if (s) s.value = '';
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.toggle('active', i.dataset.cat === cat));
+  document.getElementById('toolbar-title').textContent = catLabels[cat] || cat;
+  setToolbarForCat(cat);
+  render();
+}
+
+// Los chips viven dentro de la card, que ya abre el detalle al pulsarla:
+// sin frenar la propagación, ir a la carpeta abriría además el modal.
+function wireFolderChips(scope) {
+  scope.querySelectorAll('[data-goto-folder]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); gotoFolder(el.dataset.gotoFolder); });
+  });
+}
+// type de carpeta -> categoría del sidebar, para poder navegar al pulsar un chip
+const CAT_FOR_FTYPE = { artist: 'artists', album: 'albums', single: 'singles', libro: 'libros' };
 function folderPath(id) {
   const path = [];
   let f = folderById(id);
@@ -1915,8 +1960,16 @@ function deleteFolderDeep(id) {
     });
   }
   saveFolders(folders.filter(f => !toDelete.has(f.id)));
-  // delete cards in any deleted folder
-  saveTricks(getTricks().filter(t => !toDelete.has(t.folderId)));
+  // Se borran las cards que VIVÍAN en la carpeta, pero las que solo la referenciaban
+  // sobreviven: viven en otro sitio. Se les quita la referencia muerta para no
+  // dejarles un chip que no lleva a ninguna parte.
+  saveTricks(getTricks()
+    .filter(t => !toDelete.has(t.folderId))
+    .map(t => {
+      const refs = getRefs(t);
+      if (!refs.some(id => toDelete.has(id))) return t;
+      return { ...t, refs: refs.filter(id => !toDelete.has(id)) };
+    }));
 }
 
 // ── Plugins (folder-based: each plugin is a folder of learning cards) ──
@@ -2073,14 +2126,24 @@ function buildCard(t) {
     ? `<img class="card-image" src="${escAttr(t.imagen)}" alt="">`
     : '';
 
-  // Folder chip (foto + nombre) — solo si la card vive en un folder de Artists/Albums/Singles
-  const folder = t.folderId ? folderById(t.folderId) : null;
-  const folderChipHtml = (folder && folder.type !== 'plugin')
-    ? `<div class="card-folder-chip">${
-        folder.imagen
-          ? `<img src="${escAttr(folder.imagen)}" alt="">`
-          : `<span class="cf-ph">${({ artist: '♪', album: '◉', single: '♫', libro: '▤' })[folder.type] || '♪'}</span>`
-      }<span class="cf-name">${esc(folder.name)}</span></div>`
+  // Chips de carpeta (foto + nombre): la casa de la card y sus referencias cruzadas.
+  // Se pintan iguales a propósito — de cara a ti "de quién es esto" es lo mismo,
+  // la diferencia entre casa y referencia solo importa por dentro.
+  const chipFolders = [];
+  const home = t.folderId ? folderById(t.folderId) : null;
+  if (home && home.type !== 'plugin') chipFolders.push(home);
+  getRefs(t).forEach(id => {
+    const f = folderById(id);
+    if (f && f.type !== 'plugin' && !chipFolders.some(c => c.id === f.id)) chipFolders.push(f);
+  });
+  const chipIcon = { artist: '♪', album: '◉', single: '♫', libro: '▤' };
+  const folderChipHtml = chipFolders.length
+    ? `<div class="card-folder-chips">${chipFolders.map(f => `
+        <div class="card-folder-chip" data-goto-folder="${escAttr(f.id)}" title="Ir a ${escAttr(f.name)}">${
+          f.imagen
+            ? `<img src="${escAttr(f.imagen)}" alt="">`
+            : `<span class="cf-ph">${chipIcon[f.type] || '♪'}</span>`
+        }<span class="cf-name">${esc(f.name)}</span></div>`).join('')}</div>`
     : '';
 
   // Build preview section (click opens detail modal)
@@ -2174,6 +2237,11 @@ function buildCard(t) {
       <div class="edit-label">Carpeta</div>
       <select class="edit-input" data-f="folder">${folderOptionsHtml(t.folderId)}</select>
     </div>
+    <div class="edit-field">
+      <div class="edit-label">Referencias <span class="edit-hint">— aparece también aquí, sin salir de su categoría</span></div>
+      <div class="refs-chips" data-refs-list></div>
+      <select class="edit-input" data-refs-add>${folderOptionsHtml(null)}</select>
+    </div>
     <div class="edit-actions with-delete">
       <button class="btn btn-danger btn-delete-edit">Eliminar</button>
       <div style="display:flex; gap:8px;">
@@ -2184,6 +2252,39 @@ function buildCard(t) {
   `;
 
   div.appendChild(view);
+
+  wireFolderChips(view);
+  wireFolderChips(detail);
+
+  // Referencias: se editan sobre una copia y solo se vuelcan al guardar,
+  // para que Cancelar deshaga los cambios como en el resto de campos.
+  let editRefs = getRefs(t);
+  const refsList = edit.querySelector('[data-refs-list]');
+  const refsAdd  = edit.querySelector('[data-refs-add]');
+  function paintRefs() {
+    const items = editRefs.map(id => folderById(id)).filter(Boolean);
+    refsList.innerHTML = items.length
+      ? items.map(f => `<span class="ref-chip">${esc(f.name)}<button class="ref-x" data-rm="${escAttr(f.id)}" title="Quitar">×</button></span>`).join('')
+      : `<span class="refs-empty">Ninguna</span>`;
+    refsList.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+      editRefs = editRefs.filter(x => x !== b.dataset.rm);
+      paintRefs();
+    }));
+    // Fuera del desplegable las ya añadidas, y también la carpeta que ya es su casa:
+    // referenciar donde ya vive duplicaría el chip sin aportar nada.
+    const homeId = edit.querySelector('[data-f="folder"]').value || null;
+    [...refsAdd.options].forEach(o => {
+      o.hidden = !!o.value && (editRefs.includes(o.value) || o.value === homeId);
+    });
+    refsAdd.value = '';
+  }
+  refsAdd.addEventListener('change', () => {
+    const v = refsAdd.value;
+    if (v && !editRefs.includes(v)) editRefs.push(v);
+    paintRefs();
+  });
+  edit.querySelector('[data-f="folder"]').addEventListener('change', paintRefs);
+  paintRefs();
 
   // Image picker (wired once; edit element is reused across opens)
   setupImgPicker(
@@ -2253,7 +2354,8 @@ function buildCard(t) {
     const tricks = getTricks();
     const idx = tricks.findIndex(x => x.id === t.id);
     if (idx >= 0) {
-      tricks[idx] = { ...tricks[idx], titulo, cuerpo, bodyHtml, tags, link, imagen: editImagen, categorias, subcategoria, subtype, folderId };
+      const refs = editRefs.filter(id => id !== folderId && folderById(id));
+      tricks[idx] = { ...tricks[idx], titulo, cuerpo, bodyHtml, tags, link, imagen: editImagen, categorias, subcategoria, subtype, folderId, refs };
       saveTricks(tricks);
     }
     modalNeedsRender = true;
