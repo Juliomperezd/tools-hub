@@ -726,6 +726,11 @@
         <button class="img-remove" id="new-img-remove">Quitar imagen</button>
       </div>
     </div>
+    <div class="edit-field">
+      <div class="edit-label">Referencias <span class="edit-hint">— aparece también aquí, sin salir de su categoría</span></div>
+      <div class="refs-chips" id="new-refs-list"></div>
+      <select class="edit-input" id="new-refs-add"></select>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btn-cancel">Cancelar</button>
       <button class="btn btn-outline" id="btn-save-new">Guardar</button>
@@ -2615,10 +2620,36 @@ function renderDiscovery() {
 // ── Modal ──
 let newImagen = '';
 let newRt = null;  // rich editor instance for the create modal
+let newRefs = [];  // referencias cruzadas de la card que se está creando
+
+// Pinta las referencias del modal de creación. Mismo criterio que en el editor:
+// fuera del desplegable las ya añadidas y la carpeta donde la card va a vivir.
+function paintNewRefs() {
+  const list = document.getElementById('new-refs-list');
+  const add  = document.getElementById('new-refs-add');
+  if (!list || !add) return;
+  const items = newRefs.map(id => folderById(id)).filter(Boolean);
+  list.innerHTML = items.length
+    ? items.map(f => `<span class="ref-chip">${esc(f.name)}<button class="ref-x" data-rm="${escAttr(f.id)}" title="Quitar">×</button></span>`).join('')
+    : `<span class="refs-empty">Ninguna</span>`;
+  list.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+    newRefs = newRefs.filter(x => x !== b.dataset.rm);
+    paintNewRefs();
+  }));
+  // Se reconstruyen las opciones en cada pintado: pueden haberse creado carpetas nuevas.
+  add.innerHTML = folderOptionsHtml(null);
+  [...add.options].forEach(o => {
+    o.hidden = !!o.value && (newRefs.includes(o.value) || o.value === newFolderId);
+  });
+  add.value = '';
+}
 
 function openModal(tipo = 'texto') {
   newTipo = tipo;
   const isGrid = tipo === 'grid';
+
+  newRefs = [];          // el modal se reutiliza: sin esto heredaría las de la card anterior
+  paintNewRefs();
 
   document.getElementById('modal-title-text').textContent = isGrid ? 'Nuevo grid' : 'Nueva card';
 
@@ -2762,6 +2793,8 @@ function saveNew() {
   }
   if (newFolderId) trick.folderId = newFolderId;
   if (subtype) trick.subtype = subtype;
+  const refs = newRefs.filter(id => id !== newFolderId && folderById(id));
+  if (refs.length) trick.refs = refs;
 
   const all = getTricks();
   all.push(trick);
@@ -2832,6 +2865,14 @@ document.querySelectorAll('.sidebar-item').forEach(item => {
 });
 
 document.getElementById('btn-new').addEventListener('click', () => { newFolderId = null; openModal('texto'); });
+
+// El <select> se mantiene entre aperturas (paintNewRefs solo cambia sus <option>),
+// así que basta con engancharlo una vez.
+document.getElementById('new-refs-add').addEventListener('change', e => {
+  const v = e.target.value;
+  if (v && !newRefs.includes(v)) newRefs.push(v);
+  paintNewRefs();
+});
 
 // ── Serendipia: una card al azar de todo el Hub ──
 // Ignora categoría, subtab y carpeta a propósito: el sentido es sacarte de donde estás.
