@@ -1,0 +1,3080 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hub Musical</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f0f;
+      color: #e8e8e8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 170px;
+      background: #161616;
+      padding: 24px 0;
+      flex-shrink: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #2a2a2a;
+    }
+    .sidebar-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #666;
+      padding: 0 18px;
+      margin-bottom: 4px;
+      margin-top: 22px;
+    }
+    .sidebar-label:first-child { margin-top: 0; }
+    .sidebar-item {
+      padding: 9px 18px;
+      cursor: pointer;
+      color: #999;
+      font-size: 13px;
+      border-left: 2px solid transparent;
+      transition: color 0.12s, border-color 0.12s;
+      user-select: none;
+    }
+    .sidebar-item:hover { color: #ddd; }
+    .sidebar-item.active { color: #fff; border-left-color: #fff; background: #1e1e1e; }
+
+    /* Tool links in sidebar */
+    .sidebar-tool {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      color: #777;
+      font-size: 12px;
+      text-decoration: none;
+      border-left: 2px solid transparent;
+      transition: color 0.12s;
+    }
+    .sidebar-tool:hover { color: #ddd; }
+    /* Indicador de sync: un punto de color delante del texto de estado. */
+    #sync-badge { cursor: default; font-size: 11px; letter-spacing: .02em; }
+    #sync-badge::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: #555; flex: 0 0 auto; transition: background .2s;
+    }
+    #sync-badge[data-state="ok"]::before   { background: #3f7a4f; }
+    #sync-badge[data-state="sync"]::before { background: #7a6a3f; }
+    #sync-badge[data-state="err"]::before,
+    #sync-badge[data-state="off"]::before  { background: #7a3f3f; }
+    .sidebar-tool-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+    }
+    .sidebar-tool:hover .sidebar-tool-dot { background: #888; }
+
+    /* ── Main ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      padding: 16px 24px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      border-bottom: 1px solid #252525;
+      flex-shrink: 0;
+      background: #0f0f0f;
+    }
+    .toolbar-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #777;
+      flex: 1;
+    }
+    .search-input {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #e8e8e8;
+      padding: 7px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      width: 190px;
+      outline: none;
+      font-family: inherit;
+    }
+    .search-input:focus { border-color: #666; }
+    .search-input::placeholder { color: #555; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 7px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.12s;
+      letter-spacing: 0.03em;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .btn-outline { background: transparent; border: 1px solid #e8e8e8; color: #e8e8e8; }
+    .btn-outline:hover { background: #e8e8e8; color: #000; }
+    .btn-ghost { background: transparent; border: 1px solid #444; color: #aaa; }
+    .btn-ghost:hover { border-color: #888; color: #ddd; }
+    .btn-danger { background: transparent; border: 1px solid #5a2020; color: #d06868; }
+    .btn-danger:hover { background: #5a2020; border-color: #7a2a2a; color: #f0a0a0; }
+
+    /* ── Cards area ── */
+    .cards-area { flex: 1; overflow-y: auto; padding: 24px; }
+    /* Pinterest / masonry layout: fixed columns, natural card heights */
+    .cards-grid { column-count: 5; column-gap: 14px; }
+    @media (max-width: 1300px) { .cards-grid { column-count: 4; } }
+    @media (max-width: 900px)  { .cards-grid { column-count: 2; } }
+    @media (max-width: 560px)  { .cards-grid { column-count: 1; } }
+    .cards-grid > .card { -webkit-column-break-inside: avoid; break-inside: avoid; width: 100%; margin-bottom: 14px; }
+    .cards-grid > .card.card-grid-type { column-span: all; }
+    .cards-grid > .empty-state { column-span: all; }
+
+    /* ── Reference: breadcrumb + folders ── */
+    .ref-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; flex-wrap: wrap; }
+    .crumb { color: #888; cursor: pointer; }
+    .crumb:hover { color: #ddd; }
+    .crumb.current { color: #fff; cursor: default; }
+    .crumb-sep { color: #444; }
+    .ref-actions { display: flex; gap: 8px; }
+    .ref-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #555; margin: 6px 0 10px; }
+    .folder-grid { display: grid; grid-template-columns: repeat(auto-fill, 100px); gap: 16px; margin-bottom: 26px; }
+    .folder-tile {
+      width: 100px;
+      background: transparent; border: none; border-radius: 0;
+      cursor: pointer;
+      display: flex; flex-direction: column;
+    }
+    .folder-cover, .folder-cover-empty {
+      width: 100px; height: 100px; border-radius: 8px;
+      border: 1px solid #2c2c2c; transition: border-color 0.15s;
+    }
+    .folder-tile:hover .folder-cover, .folder-tile:hover .folder-cover-empty { border-color: #5a5a5a; }
+    .folder-cover { object-fit: cover; background: #141414; display: block; }
+    .folder-cover-empty { background: linear-gradient(135deg,#202020,#161616); display: flex; align-items: center; justify-content: center; font-size: 28px; color: #3a3a3a; }
+    .folder-info { padding: 7px 2px 0; display: flex; flex-direction: column; gap: 2px; }
+    .folder-name { font-size: 12px; font-weight: 600; color: #eee; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .folder-desc { font-size: 10px; color: #8a8a8a; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .folder-meta { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+    .folder-edit-btn {
+      align-self: flex-start; margin-top: 1px; background: none; border: none; color: #555;
+      font-size: 10px; cursor: pointer; padding: 0;
+    }
+    .folder-edit-btn:hover { color: #aaa; }
+    .ref-empty { color: #555; font-size: 13px; padding: 30px 4px; }
+
+    /* ── Plugins Kanban view ── */
+    .kanban { column-count: 2; column-gap: 22px; }
+    @media (max-width: 760px) { .kanban { column-count: 1; } }
+    .kanban-section { break-inside: avoid; margin-bottom: 26px; }
+    .kanban-title { font-size: 22px; font-weight: 800; color: #fff; margin: 0 0 12px; letter-spacing: -0.01em; }
+    .kanban-row { display: flex; align-items: center; gap: 12px; background: #1b1b1b; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.12s, background 0.12s; }
+    .kanban-row:hover { border-color: #4a4a4a; background: #202020; }
+    .kanban-icon { width: 46px; height: 46px; border-radius: 9px; flex-shrink: 0; object-fit: cover; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #fff; }
+    .kanban-row-text { min-width: 0; }
+    .kanban-row-name { font-size: 15px; font-weight: 700; color: #f2f2f2; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .kanban-row-desc { font-size: 12px; color: #8a8a8a; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .kanban-add { font-size: 11px; color: #555; cursor: pointer; padding: 6px 2px; }
+    .kanban-add:hover { color: #aaa; }
+
+    /* ── Card ── */
+    .card {
+      background: #1c1c1c;
+      border: 1px solid #303030;
+      border-radius: 6px;
+      padding: 18px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .card:hover { border-color: #4a4a4a; background: #1f1f1f; }
+    .card-folder-chip { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; font-size: 10px; color: #888; letter-spacing: 0.04em; }
+    .card-folder-chip img { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; flex-shrink: 0; }
+    .card-folder-chip .cf-ph { width: 16px; height: 16px; border-radius: 3px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #888; flex-shrink: 0; }
+    .card-folder-chip .cf-name { text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card-folder-chip + .card-image { margin-top: 0; border-radius: 6px; }
+    .card-detail .card-folder-chip + .card-image { margin-top: 0; border-radius: 8px; }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 9px;
+      line-height: 1.4;
+    }
+    .card-body {
+      font-size: 13px;
+      color: #c0c0c0;
+      line-height: 1.7;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+    /* preview body: clamp to a few lines */
+    .card-view .card-body {
+      display: -webkit-box;
+      -webkit-line-clamp: 6;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    /* detail modal */
+    .card-detail { display: flex; flex-direction: column; gap: 12px; }
+    .card-detail .card-image { margin: -28px -28px 4px -28px; width: calc(100% + 56px); border-radius: 8px 8px 0 0; }
+    .detail-title { font-size: 18px; font-weight: 600; color: #fff; line-height: 1.35; }
+    .detail-body { font-size: 14px; color: #c8c8c8; line-height: 1.75; white-space: pre-wrap; }
+    .inline-img { display: block; max-width: 100%; border-radius: 6px; margin: 12px 0; }
+    /* rich-rendered detail body */
+    .detail-body.rich { white-space: normal; }
+    .detail-body.rich img { max-width: 100%; border-radius: 6px; margin: 12px 0; display: block; }
+    .detail-body.rich ul { margin: 8px 0 8px 22px; padding: 0; }
+    .detail-body.rich li { margin: 2px 0; }
+    .detail-body.rich strong { color: #fff; }
+    .detail-body.rich a { color: #8ab4f8; }
+
+    /* ── Rich text editor (Notion-like) ── */
+    .rt-toolbar { display: flex; gap: 4px; margin-bottom: 6px; }
+    .rt-tb-btn { background: #181818; border: 1px solid #333; color: #aaa; border-radius: 4px; min-width: 30px; height: 28px; font-size: 13px; cursor: pointer; }
+    .rt-tb-btn:hover { color: #fff; border-color: #555; }
+    .rt-editor { background: #141414; border: 1px solid #3a3a3a; border-radius: 4px; padding: 11px 12px; min-height: 130px; font-size: 13px; line-height: 1.65; color: #e8e8e8; outline: none; }
+    .rt-editor:focus { border-color: #666; }
+    .rt-editor:empty:before { content: attr(data-placeholder); color: #555; }
+    .rt-editor img { max-width: 100%; border-radius: 6px; margin: 8px 0; display: block; }
+    .rt-editor ul { margin: 6px 0 6px 22px; }
+    .rt-editor strong { color: #fff; }
+    .rt-slash { position: fixed; z-index: 300; background: #1c1c1c; border: 1px solid #444; border-radius: 8px; padding: 4px; min-width: 210px; box-shadow: 0 10px 30px rgba(0,0,0,0.55); }
+    .rt-slash-item { padding: 7px 10px; border-radius: 5px; cursor: pointer; display: flex; flex-direction: column; gap: 1px; }
+    .rt-slash-item .l { font-size: 13px; color: #eee; }
+    .rt-slash-item .h { font-size: 11px; color: #777; }
+    .rt-slash-item.active { background: #2a2a2a; }
+    .detail-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
+    .card-link {
+      font-size: 11px;
+      color: #777;
+      text-decoration: none;
+      display: inline-block;
+      margin-bottom: 10px;
+      word-break: break-all;
+    }
+    .card-link:hover { color: #bbb; }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; min-height: 2px; }
+    .tag {
+      background: #252525;
+      color: #888;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid #333;
+    }
+    .card-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .card-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #555;
+      font-size: 13px;
+      padding: 3px 6px;
+      transition: color 0.12s;
+      font-family: inherit;
+      border-radius: 3px;
+    }
+    .card-btn:hover { color: #ddd; background: #252525; }
+
+    /* ── Edit mode ── */
+    .card-edit { display: none; flex-direction: column; gap: 10px; }
+    .card-edit.active { display: flex; }
+    .card-view.hidden { display: none; }
+    .edit-input {
+      background: #141414;
+      border: 1px solid #3a3a3a;
+      color: #e8e8e8;
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+      width: 100%;
+    }
+    .edit-input:focus { border-color: #666; }
+    .edit-textarea { resize: vertical; min-height: 80px; line-height: 1.55; }
+    .edit-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: #666; margin-bottom: 4px; }
+    .edit-field { display: flex; flex-direction: column; }
+    .edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; }
+    .edit-actions.with-delete { justify-content: space-between; }
+    .edit-modal-title { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 70px 20px;
+      color: #555;
+      font-size: 13px;
+      line-height: 2.2;
+    }
+    .empty-state code {
+      background: #1c1c1c;
+      border: 1px solid #333;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      color: #888;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #1c1c1c;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 28px;
+      width: 760px;
+      max-width: 94vw;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .modal-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #ccc;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+
+    /* ── Card image ── */
+    .card-image {
+      width: calc(100% + 36px);
+      margin: -18px -18px 14px -18px;
+      border-radius: 6px 6px 0 0;
+      display: block;
+      height: auto;
+    }
+
+    /* ── Image picker (in forms) ── */
+    .img-picker-zone {
+      border: 1px dashed #3a3a3a;
+      border-radius: 4px;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.12s;
+      position: relative;
+    }
+    .img-picker-zone:hover { border-color: #777; }
+    .img-picker-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .img-picker-label { font-size: 12px; color: #666; pointer-events: none; }
+    .img-picker-preview {
+      width: 100%;
+      max-height: 140px;
+      object-fit: cover;
+      border-radius: 3px;
+      display: none;
+      margin-bottom: 8px;
+    }
+    .img-picker-preview.visible { display: block; }
+    .img-remove {
+      font-size: 11px;
+      color: #666;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: inherit;
+      text-decoration: underline;
+      display: none;
+      margin-top: 4px;
+    }
+    .img-remove.visible { display: inline-block; }
+
+    /* ── Sub-tabs ── */
+    .subtabs { display: flex; gap: 0; padding: 0 20px; border-bottom: 1px solid #222; background: #111; flex-shrink: 0; }
+    .subtabs.hidden { display: none; }
+    .subtab { padding: 10px 18px; font-size: 12px; color: #555; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.1s, border-color 0.1s; letter-spacing: 0.02em; }
+    .subtab:hover { color: #aaa; }
+    .subtab.active { color: #fff; border-bottom-color: #fff; }
+    /* secondary (third-level) tabs */
+    .subtabs-sec { background: #0c0c0c; padding: 8px 20px; gap: 7px; flex-wrap: wrap; border-bottom: 1px solid #1c1c1c; }
+    .subtabs-sec .subtab { padding: 4px 11px; font-size: 11px; border: 1px solid #2a2a2a; border-radius: 20px; color: #777; }
+    .subtabs-sec .subtab:hover { color: #ccc; border-color: #444; }
+    .subtabs-sec .subtab.active { color: #111; background: #ddd; border-color: #ddd; }
+
+    /* ── Category pills ── */
+    .cat-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .cat-pill { display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid #333; border-radius: 20px; font-size: 11px; cursor: pointer; color: #666; transition: border-color 0.1s, color 0.1s; user-select: none; }
+    .cat-pill:has(input:checked) { border-color: #ccc; color: #ccc; }
+    .cat-pill input { display: none; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+    /* ── Agents Doc ── */
+    .agents-doc { display: flex; flex-direction: column; }
+    .adoc-tabs { display: flex; border-bottom: 1px solid #222; background: #111; margin: -24px -24px 24px -24px; padding: 0 4px; }
+    .adoc-tab { padding: 10px 18px; font-size: 12px; color: #555; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.1s, border-color 0.1s; letter-spacing: 0.02em; font-family: inherit; }
+    .adoc-tab:hover { color: #aaa; }
+    .adoc-tab.active { color: #fff; border-bottom-color: #fff; }
+    .adoc-intro { font-size: 12px; color: #666; margin-bottom: 20px; line-height: 1.7; }
+    .adoc-intro code { background: #1c1c1c; border: 1px solid #333; padding: 1px 6px; border-radius: 3px; font-size: 11px; color: #aaa; }
+    .adoc-cmd-grid, .adoc-agent-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .adoc-cmd-card { background: #1c1c1c; border: 1px solid #303030; border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 11px; }
+    .adoc-cmd-header { display: flex; align-items: center; gap: 10px; }
+    .adoc-cmd-badge { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; font-weight: 600; color: #e8e8e8; background: #252525; border: 1px solid #404040; padding: 3px 10px; border-radius: 4px; flex-shrink: 0; }
+    .adoc-cmd-title { font-size: 12px; color: #888; }
+    .adoc-cmd-desc { font-size: 12px; color: #aaa; line-height: 1.65; }
+    .adoc-cmd-meta { display: flex; flex-direction: column; gap: 11px; margin-top: 2px; }
+    .adoc-meta-block { display: flex; flex-direction: column; gap: 4px; }
+    .adoc-meta-row { display: flex; align-items: baseline; gap: 8px; }
+    .adoc-meta-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0; }
+    .adoc-meta-block .adoc-meta-text { color: #888; line-height: 1.6; }
+    .adoc-meta-code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; color: #777; background: #141414; border: 1px solid #2a2a2a; padding: 2px 6px; border-radius: 3px; }
+    .adoc-meta-text { font-size: 11px; color: #666; }
+    .adoc-agent-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px; }
+    .adoc-agent-header { display: flex; align-items: center; gap: 8px; }
+    .adoc-agent-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .adoc-agent-name { font-size: 13px; font-weight: 600; color: #ddd; flex: 1; }
+    .adoc-badge { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; padding: 2px 7px; border-radius: 3px; flex-shrink: 0; }
+    .adoc-badge-versatil { background: #162416; color: #5a9a5a; border: 1px solid #243a24; }
+    .adoc-badge-excl { background: #161628; color: #6a6ab8; border: 1px solid #24244a; }
+    .adoc-agent-desc { font-size: 11px; color: #888; line-height: 1.6; }
+
+    /* ── Discovery ── */
+    .disc-tab-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+    .disc-list { display: flex; flex-direction: column; gap: 8px; }
+    .disc-link { display: flex; align-items: center; justify-content: space-between; gap: 14px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 13px 16px; text-decoration: none; transition: background 0.1s, border-color 0.1s; }
+    .disc-link:hover { background: #1f1f1f; border-color: #3a3a3a; }
+    .disc-link-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .disc-link-name { font-size: 13px; font-weight: 600; color: #ddd; }
+    .disc-link-desc { font-size: 11px; color: #777; line-height: 1.5; }
+    .disc-link-host { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; color: #555; background: #141414; border: 1px solid #2a2a2a; padding: 2px 8px; border-radius: 3px; flex-shrink: 0; white-space: nowrap; }
+    .disc-empty { font-size: 12px; color: #666; padding: 24px 4px; line-height: 1.6; }
+
+    /* ── Step Grid ── */
+    .grid-wrapper { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; user-select: none; overflow-x: auto; }
+    .grid-track { display: flex; align-items: center; gap: 6px; min-width: max-content; }
+    .grid-track-label { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.05em; width: 50px; flex-shrink: 0; text-align: right; }
+    .grid-cells { display: grid; gap: 1.5px; }
+    .grid-cell { height: 16px; background: #212121; border-radius: 2px; cursor: pointer; transition: background 0.06s; }
+    .grid-cell.beat-1 { margin-left: 3px; }
+    .grid-cell:hover { background: #303030; }
+    .grid-cell.on { background: #d8d8d8; }
+    .grid-cell.on:hover { background: #bbb; }
+    .grid-readonly .grid-cell { cursor: pointer; }
+    .grid-readonly .grid-cell:hover { background: #212121; }
+    .grid-readonly .grid-cell.on:hover { background: #d8d8d8; }
+    .gtrack-kick  .grid-cell.on { background: #e89a50; }
+    .gtrack-snare .grid-cell.on { background: #5090e8; }
+    .gtrack-hihat .grid-cell.on { background: #50c870; }
+    .gtrack-ohat  .grid-cell.on { background: #88d8a0; }
+    .gtrack-perc  .grid-cell.on { background: #b050e8; }
+    .gtrack-chord  .grid-cell.on { background: #88b8d8; }
+    .gtrack-melody .grid-cell.on { background: #e8c050; }
+    .grid-card-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .grid-badge-type  { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; padding: 2px 7px; border-radius: 3px; background: #252525; border: 1px solid #333; color: #666; }
+    .grid-badge-res   { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; color: #555; background: #1a1a1a; border: 1px solid #2a2a2a; padding: 1px 6px; border-radius: 3px; }
+    .grid-badge-steps { font-size: 10px; color: #444; }
+
+    /* grid ruler */
+    .grid-ruler { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 3px; min-width: max-content; }
+    .grid-ruler-pad { width: 50px; flex-shrink: 0; }
+    .grid-ruler-cells { display: grid; align-items: flex-end; gap: 1.5px; }
+    .ruler-cell { font-size: 7px; overflow: hidden; white-space: nowrap; }
+    .ruler-cell.rbeat { color: #3a3a3a; padding-left: 2px; border-left: 1px solid #2e2e2e; }
+    .ruler-cell.rbar  { color: #888;    padding-left: 2px; border-left: 1px solid #505050; font-weight: 600; }
+    .ruler-cell.beat-1 { margin-left: 3px; }
+
+    /* modal: scrollable when tall */
+    .modal { max-height: 90vh; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <span class="sidebar-label">Teoría</span>
+  <div class="sidebar-item active" data-cat="armonia">Armonía</div>
+  <div class="sidebar-item" data-cat="melodia">Melodía</div>
+  <div class="sidebar-item" data-cat="ritmo">Ritmo</div>
+  <div class="sidebar-item" data-cat="sound">Sound</div>
+
+  <span class="sidebar-label">Producción</span>
+  <div class="sidebar-item" data-cat="vocals">Vocals</div>
+  <div class="sidebar-item" data-cat="bass">Bass</div>
+  <div class="sidebar-item" data-cat="pads">Pads / Chords</div>
+  <div class="sidebar-item" data-cat="drops">Drops / Hooks</div>
+  <div class="sidebar-item" data-cat="drums">Drums</div>
+  <div class="sidebar-item" data-cat="arrangement">Arrangement</div>
+  <div class="sidebar-item" data-cat="process">Process</div>
+  <div class="sidebar-item" data-cat="sampling">Sampling</div>
+  <div class="sidebar-item" data-cat="misc">Misc.</div>
+  <div class="sidebar-item" data-cat="career">Career</div>
+
+  <span class="sidebar-label">Referencia</span>
+  <div class="sidebar-item" data-cat="artists">Artists</div>
+  <div class="sidebar-item" data-cat="albums">Albums</div>
+  <div class="sidebar-item" data-cat="singles">Singles</div>
+  <div class="sidebar-item" data-cat="libros">Libros</div>
+
+  <span class="sidebar-label">Herramientas</span>
+  <div class="sidebar-item" data-cat="plugins">Plugins</div>
+  <div class="sidebar-item" data-cat="sp404">SP404</div>
+  <div class="sidebar-item" data-cat="microkorg">MicroKorg</div>
+  <div class="sidebar-item" data-cat="discovery">Discovery</div>
+  <div class="sidebar-item" data-cat="agents-doc">Agents</div>
+  <a class="sidebar-tool" href="./ZZ - Discogs Random.html" target="_blank">
+    <span class="sidebar-tool-dot"></span>Discogs Random
+  </a>
+  <a class="sidebar-tool" href="./ZZ - IdeaGenerator-Random.html" target="_blank">
+    <span class="sidebar-tool-dot"></span>Idea Generator
+  </a>
+  <a class="sidebar-tool" href="./ZZ - Random Artist.html" target="_blank">
+    <span class="sidebar-tool-dot"></span>Random Artist
+  </a>
+  <a class="sidebar-tool" href="https://cnvmp3.com/v54" target="_blank">
+    <span class="sidebar-tool-dot"></span>YT → MP3
+  </a>
+  <a class="sidebar-tool" href="https://www.all8.com/tools/bpm.htm" target="_blank">
+    <span class="sidebar-tool-dot"></span>BPM Tap
+  </a>
+
+  <span class="sidebar-label">Sync</span>
+  <div class="sidebar-tool" id="sync-badge" data-state="sync">Conectando…</div>
+
+  <span class="sidebar-label">Backup</span>
+  <div class="sidebar-tool" id="btn-export-backup">
+    <span class="sidebar-tool-dot"></span>Exportar todo
+  </div>
+  <div class="sidebar-tool" id="btn-import-backup">
+    <span class="sidebar-tool-dot"></span>Importar backup
+  </div>
+</nav>
+
+<div class="main">
+  <div class="toolbar">
+    <span class="toolbar-title" id="toolbar-title">Armonía</span>
+    <input class="search-input" id="search" placeholder="Buscar…" type="text">
+    <button class="btn btn-ghost" id="btn-import">Importar JSON</button>
+    <button class="btn btn-ghost" id="btn-new-grid">+ Grid</button>
+    <button class="btn btn-outline" id="btn-new">+ Card</button>
+  </div>
+
+  <div id="subtabs" class="subtabs hidden">
+    <button class="subtab active" data-sub="tricks">Tricks</button>
+    <button class="subtab" data-sub="examples">Examples</button>
+    <button class="subtab" data-sub="theory">Theory</button>
+  </div>
+
+  <div id="subtabs2" class="subtabs subtabs-sec hidden"></div>
+
+  <div id="content-area" class="cards-area">
+    <div class="cards-grid" id="cards-grid"></div>
+  </div>
+</div>
+
+<!-- Modal: nueva card -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title-text">Nueva card</div>
+    <div class="edit-field">
+      <div class="edit-label">Categorías *</div>
+      <div class="cat-picker" id="new-cat-picker">
+        <label class="cat-pill"><input type="checkbox" value="armonia"> Armonía</label>
+        <label class="cat-pill"><input type="checkbox" value="melodia"> Melodía</label>
+        <label class="cat-pill"><input type="checkbox" value="ritmo"> Ritmo</label>
+        <label class="cat-pill"><input type="checkbox" value="sound"> Sound</label>
+        <label class="cat-pill"><input type="checkbox" value="vocals"> Vocals</label>
+        <label class="cat-pill"><input type="checkbox" value="bass"> Bass</label>
+        <label class="cat-pill"><input type="checkbox" value="pads"> Pads / Chords</label>
+        <label class="cat-pill"><input type="checkbox" value="drops"> Drops / Hooks</label>
+        <label class="cat-pill"><input type="checkbox" value="drums"> Drums</label>
+        <label class="cat-pill"><input type="checkbox" value="arrangement"> Arrangement</label>
+        <label class="cat-pill"><input type="checkbox" value="process"> Process</label>
+        <label class="cat-pill"><input type="checkbox" value="sampling"> Sampling</label>
+        <label class="cat-pill"><input type="checkbox" value="misc"> Misc.</label>
+        <label class="cat-pill"><input type="checkbox" value="career"> Career</label>
+        <label class="cat-pill"><input type="checkbox" value="plugins"> Plugins</label>
+        <label class="cat-pill"><input type="checkbox" value="sp404"> SP404</label>
+        <label class="cat-pill"><input type="checkbox" value="microkorg"> MicroKorg</label>
+      </div>
+    </div>
+    <div class="edit-field" id="new-subcat-field" style="display:none">
+      <div class="edit-label">Tipo</div>
+      <div class="cat-picker" id="new-subcat-picker"></div>
+    </div>
+    <div class="edit-field" id="new-subtype-field" style="display:none">
+      <div class="edit-label">Subtipo</div>
+      <select class="edit-input" id="new-subtype-picker"></select>
+    </div>
+    <div id="new-grid-opts" style="display:none; flex-direction:column; gap:12px;">
+      <div class="edit-field">
+        <div class="edit-label">Grid type</div>
+        <div class="cat-picker">
+          <label class="cat-pill"><input type="radio" name="new-gtype" value="drums" checked> Drums</label>
+          <label class="cat-pill"><input type="radio" name="new-gtype" value="chords"> Chords</label>
+          <label class="cat-pill"><input type="radio" name="new-gtype" value="melody"> Melody</label>
+        </div>
+      </div>
+      <div class="edit-field">
+        <div class="edit-label">Resolución</div>
+        <div class="cat-picker">
+          <label class="cat-pill"><input type="radio" name="new-gres" value="1 Bar"> 1 Bar</label>
+          <label class="cat-pill"><input type="radio" name="new-gres" value="1/4"> 1/4</label>
+          <label class="cat-pill"><input type="radio" name="new-gres" value="1/8"> 1/8</label>
+          <label class="cat-pill"><input type="radio" name="new-gres" value="1/16" checked> 1/16</label>
+          <label class="cat-pill"><input type="radio" name="new-gres" value="1/32"> 1/32</label>
+        </div>
+      </div>
+      <div class="edit-field" id="new-grid-voices-field" style="display:none">
+        <div class="edit-label">Voces</div>
+        <div class="cat-picker">
+          <label class="cat-pill"><input type="radio" name="new-gvoices" value="3" checked> 3</label>
+          <label class="cat-pill"><input type="radio" name="new-gvoices" value="4"> 4</label>
+          <label class="cat-pill"><input type="radio" name="new-gvoices" value="5"> 5</label>
+        </div>
+      </div>
+      <div class="edit-field">
+        <div class="edit-label">Grid</div>
+        <div id="new-grid-painter"></div>
+        <button class="btn btn-ghost" id="btn-midi-import-modal" type="button" style="margin-top:8px;font-size:11px;padding:5px 10px;letter-spacing:0.03em;">↑ Importar MIDI</button>
+      </div>
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Título *</div>
+      <input class="edit-input" id="new-titulo" placeholder="Nombre del truco o concepto">
+    </div>
+    <div class="edit-field" id="new-field-cuerpo">
+      <div class="edit-label">Descripción *</div>
+      <div data-rt-mount-new></div>
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Tags <span style="color:#444">(coma-separados)</span></div>
+      <input class="edit-input" id="new-tags" placeholder="acordes, soul, house">
+    </div>
+    <div class="edit-field" id="new-field-link">
+      <div class="edit-label">Link <span style="color:#444">(opcional)</span></div>
+      <input class="edit-input" id="new-link" placeholder="https://…">
+    </div>
+    <div class="edit-field" id="new-field-imagen">
+      <div class="edit-label">Imagen <span style="color:#444">(opcional)</span></div>
+      <div class="img-picker-zone" id="new-img-zone">
+        <input type="file" accept="image/*" id="new-img-input">
+        <img class="img-picker-preview" id="new-img-preview">
+        <div class="img-picker-label" id="new-img-label">Haz clic para añadir imagen</div>
+        <button class="img-remove" id="new-img-remove">Quitar imagen</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btn-cancel">Cancelar</button>
+      <button class="btn btn-outline" id="btn-save-new">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: detalle / editar card -->
+<div class="modal-overlay" id="card-modal">
+  <div class="modal" id="card-modal-box"></div>
+</div>
+
+<input type="file" id="file-input" accept=".json" style="display:none">
+<input type="file" id="backup-input" accept=".json" style="display:none">
+
+<script>
+const STORAGE_KEY = 'hub_tricks';
+const SUBCATTED = new Set(['armonia', 'ritmo', 'sound', 'bass', 'pads', 'drops', 'drums', 'melodia', 'plugins']);
+
+// ── Almacenamiento: IndexedDB con caché en memoria ──
+// Sustituye a localStorage (límite ~5 MB) para no tener tope práctico de espacio.
+// La app sigue leyendo/escribiendo de forma síncrona contra una caché en memoria (MEM);
+// los cambios se persisten de forma asíncrona en IndexedDB.
+let MEM = {};        // caché síncrona: valores string, igual que localStorage
+let _idb = null;     // handle de IndexedDB (null si no está disponible → fallback a localStorage)
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('hub_db', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbAll(db) {
+  return new Promise((resolve, reject) => {
+    const out = {};
+    const req = db.transaction('kv', 'readonly').objectStore('kv').openCursor();
+    req.onsuccess = () => { const c = req.result; if (c) { out[c.key] = c.value; c.continue(); } else resolve(out); };
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbPut(key, val) {
+  if (!_idb) return;
+  try { _idb.transaction('kv', 'readwrite').objectStore('kv').put(val, key); }
+  catch (e) { console.error('idbPut', e); }
+}
+
+// API síncrona de reemplazo de localStorage
+function lsGet(key) { return (key in MEM) ? MEM[key] : null; }
+function lsSet(key, val) {
+  MEM[key] = String(val);
+  if (_idb) { idbPut(key, MEM[key]); return true; }
+  // Fallback a localStorage si IndexedDB no está disponible
+  try { localStorage.setItem(key, MEM[key]); return true; }
+  catch (err) {
+    alert('No se pudo guardar (almacenamiento de respaldo lleno). Exporta un backup (Sidebar → Backup) para no perder nada.');
+    return false;
+  }
+}
+
+async function initStorage() {
+  try {
+    _idb = await idbOpen();
+    MEM = await idbAll(_idb);
+    // Migración única desde localStorage la primera vez (IndexedDB vacío + datos viejos presentes)
+    if (Object.keys(MEM).length === 0) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('hub_')) { MEM[k] = localStorage.getItem(k); idbPut(k, MEM[k]); }
+      }
+    }
+  } catch (e) {
+    console.error('IndexedDB no disponible, usando localStorage:', e);
+    _idb = null;
+    MEM = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('hub_')) MEM[k] = localStorage.getItem(k);
+    }
+  }
+}
+
+// ── Sincronización con Supabase ──
+// La app sigue leyendo/escribiendo contra MEM de forma síncrona (no se entera de nada).
+// Aquí solo se traduce ese modelo "un blob por clave" a "una fila por card" en la red:
+// al guardar se calcula el diff y se suben SOLO las cards que cambiaron.
+// IndexedDB queda como caché offline: sin internet la app funciona igual y sube al volver.
+const SUPA_URL = 'https://kqupemycgbpzzkzrsxtw.supabase.co';
+const SUPA_KEY = 'sb_publishable_WYmpyFGZ6bad4Jy6GfHACQ_ytBufjhb';
+const SYNC_TABLES  = { hub_tricks: 'hub_cards', hub_folders: 'hub_folders' };
+const PENDING_KEY  = 'hub_sync_pending';   // cola de cambios sin subir (sobrevive a recargas)
+const STAMP_KEY    = 'hub_sync_stamp';     // último updated_at visto por tabla
+const PAGE_ROWS    = 50;                   // filas por página (hay cards de 200 KB)
+const MAX_BODY     = 1500000;              // tope de bytes por request
+
+let _snap    = {};        // clave -> Map(id -> JSON) última versión que sabemos que está arriba
+let _flushing = false;
+let _syncErr  = null;
+
+async function supaReq(path, opts = {}) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SUPA_KEY,
+      Authorization: `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+  return res;
+}
+
+// Paginado: sin esto PostgREST corta a 1000 filas por defecto y perderías cards en silencio.
+async function supaFetchAll(table) {
+  const out = [];
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const res  = await supaReq(`${table}?select=id,data,deleted&order=id`,
+                               { headers: { Range: `${from}-${from + PAGE_ROWS - 1}` } });
+    const rows = await res.json();
+    out.push(...rows);
+    if (rows.length < PAGE_ROWS) break;
+  }
+  return out;
+}
+
+// Baja todo y lo vuelca en MEM. Devuelve true si algo cambió respecto a lo que había.
+async function remotePull() {
+  let changed = false;
+  for (const [key, table] of Object.entries(SYNC_TABLES)) {
+    const rows = await supaFetchAll(table);
+    const live = rows.filter(r => !r.deleted);
+    const json = JSON.stringify(live.map(r => r.data));
+    if (MEM[key] !== json) { MEM[key] = json; idbPut(key, json); changed = true; }
+    _snap[key] = new Map(live.map(r => [String(r.id), JSON.stringify(r.data)]));
+  }
+  return changed;
+}
+
+function getPending()   { try { return JSON.parse(MEM[PENDING_KEY]) || []; } catch { return []; } }
+function setPending(q)  { MEM[PENDING_KEY] = JSON.stringify(q); idbPut(PENDING_KEY, MEM[PENDING_KEY]); }
+
+// Compara el estado actual con la última versión subida y encola solo la diferencia.
+function syncPush(key) {
+  const table = SYNC_TABLES[key];
+  if (!table) return;
+  let arr;
+  try { arr = JSON.parse(MEM[key]) || []; } catch { return; }
+
+  const cur  = new Map(arr.map(x => [String(x.id), JSON.stringify(x)]));
+  const prev = _snap[key] || new Map();
+  const ups  = [];
+  for (const [id, s] of cur) if (prev.get(id) !== s) ups.push({ id, data: JSON.parse(s), deleted: false });
+  const dels = [...prev.keys()].filter(id => !cur.has(id));
+  if (!ups.length && !dels.length) return;
+
+  const q = getPending();
+  // Los upserts se trocean por peso, no por número: una sola card puede pesar 200 KB.
+  let batch = [], size = 0;
+  for (const r of ups) {
+    const b = JSON.stringify(r).length;
+    if (batch.length && size + b > MAX_BODY) { q.push({ t: 'up', table, rows: batch }); batch = []; size = 0; }
+    batch.push(r); size += b;
+  }
+  if (batch.length) q.push({ t: 'up', table, rows: batch });
+  // Borrado lógico: si la fila desapareciera, el otro dispositivo la resucitaría al subir su copia.
+  if (dels.length) q.push({ t: 'del', table, ids: dels });
+
+  setPending(q);
+  _snap[key] = cur;
+  flushQueue();
+}
+
+async function flushQueue() {
+  if (_flushing || !navigator.onLine) return;
+  _flushing = true;
+  setSyncBadge('sync');
+  try {
+    let q = getPending();
+    while (q.length) {
+      const op = q[0];
+      const stamp = new Date().toISOString();
+      if (op.t === 'up') {
+        await supaReq(op.table, {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(op.rows.map(r => ({ ...r, updated_at: stamp })))
+        });
+      } else {
+        // Se codifica cada id por separado: encodear la lista entera convertiría
+        // las comas separadoras en %2C y PostgREST dejaría de ver varios valores.
+        const list = op.ids.map(id => `"${encodeURIComponent(String(id).replace(/"/g, '""'))}"`).join(',');
+        await supaReq(`${op.table}?id=in.(${list})`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ deleted: true, updated_at: stamp })
+        });
+      }
+      q.shift();
+      setPending(q);
+    }
+    _syncErr = null;
+    setSyncBadge('ok');
+  } catch (e) {
+    // La cola se conserva: se reintenta al recuperar red o en el siguiente guardado.
+    _syncErr = e.message;
+    console.error('sync', e);
+    setSyncBadge('err');
+  } finally {
+    _flushing = false;
+  }
+}
+
+// Sondeo barato: pide solo el updated_at más reciente y baja todo solo si hay algo nuevo.
+async function pollRemote() {
+  if (!navigator.onLine || _flushing || getPending().length) return;
+  if (document.querySelector('.modal-overlay.active')) return;  // no pisar una edición abierta
+  try {
+    let stamps = {};
+    try { stamps = JSON.parse(MEM[STAMP_KEY]) || {}; } catch {}
+    let fresh = false;
+    for (const table of Object.values(SYNC_TABLES)) {
+      const res  = await supaReq(`${table}?select=updated_at&order=updated_at.desc&limit=1`);
+      const rows = await res.json();
+      const last = rows[0]?.updated_at || null;
+      if (last && last !== stamps[table]) { stamps[table] = last; fresh = true; }
+    }
+    if (fresh) {
+      MEM[STAMP_KEY] = JSON.stringify(stamps);
+      idbPut(STAMP_KEY, MEM[STAMP_KEY]);
+      if (await remotePull()) render();
+      setSyncBadge('ok');
+    }
+  } catch (e) { console.error('poll', e); }
+}
+
+function setSyncBadge(state) {
+  const el = document.getElementById('sync-badge');
+  if (!el) return;
+  const pend = getPending().length;
+  const txt = {
+    sync: 'Sincronizando…',
+    ok:   pend ? `${pend} sin subir` : 'Sincronizado',
+    err:  'Sin conexión — se reintentará',
+    off:  'Sin conexión — se reintentará'
+  }[state] || '';
+  el.textContent = txt;
+  el.dataset.state = state;
+  el.title = _syncErr || '';
+}
+
+window.addEventListener('online',  () => { setSyncBadge('sync'); flushQueue(); });
+window.addEventListener('offline', () => setSyncBadge('off'));
+
+// Subcategory (sub-tab) definitions per category. Falls back to _default.
+const SUBCAT_DEFS = {
+  _default: [
+    { v: 'tricks',   l: 'Tricks' },
+    { v: 'examples', l: 'Examples' },
+    { v: 'theory',   l: 'Theory' }
+  ],
+  plugins: [
+    { v: 'generadores',  l: 'Generadores' },
+    { v: 'efectos',      l: 'Efectos' },
+    { v: 'multiefectos', l: 'Multiefectos' },
+    { v: 'midi-notes',   l: 'Midi/Notes' },
+    { v: 'midi-otros',   l: 'Midi/Otros' }
+  ]
+};
+function subcatsFor(cat) { return SUBCAT_DEFS[cat] || SUBCAT_DEFS._default; }
+function defaultSubcat(cat) { return subcatsFor(cat)[0].v; }
+function subcatLabel(cat, v) {
+  const found = subcatsFor(cat).find(s => s.v === v);
+  return found ? found.l : v;
+}
+
+// Third level: a sub-tab can have its own sub-categories. Keyed by `cat/subcat`.
+const SUBSUB_DEFS = {
+  'plugins/generadores': ['Synth','Piano','Strings','Guitar','Sampler','Kontakt','Drums'],
+  'plugins/efectos': ['Audio','Delay','Reverb','Distorsion','Drums','Motion','Steps','Sidechain','Texturas','Tune','Vocals']
+};
+function subsubsFor(cat, subcat) { return SUBSUB_DEFS[`${cat}/${subcat}`] || null; }
+
+const GRID_TRACK_DEFS = {
+  drums:  [
+    { name: 'Kick',    cls: 'gtrack-kick'  },
+    { name: 'Snare',   cls: 'gtrack-snare' },
+    { name: 'HiHat',   cls: 'gtrack-hihat' },
+    { name: 'OHat',    cls: 'gtrack-ohat'  },
+    { name: 'Perc',    cls: 'gtrack-perc'  }
+  ],
+  chords: [
+    { name: '9th',  cls: 'gtrack-chord' },
+    { name: '7th',  cls: 'gtrack-chord' },
+    { name: '5th',  cls: 'gtrack-chord' },
+    { name: '3rd',  cls: 'gtrack-chord' },
+    { name: 'Root', cls: 'gtrack-chord' }
+  ],
+  melody: [{ name: '—', cls: 'gtrack-melody' }]
+};
+const BARS    = 4;
+const RES_SPB = { '1 Bar':1, '1/4':4, '1/8':8, '1/16':16, '1/32':32 }; // steps per bar
+
+let gPainting = false, gPaintVal = 1;
+document.addEventListener('mouseup', () => { gPainting = false; });
+let currentCat = 'armonia';
+let currentSubcat = 'tricks';
+let currentSubsub = 'all';
+let searchQuery = '';
+let agentsDocTab = 'comandos';
+let discoveryTab = 'reddits';
+let newTipo = 'texto';
+let currentFolder = null;   // folder id we're navigating inside (Reference)
+let newFolderId = null;     // folder a new card will be filed into
+
+const REFCATS  = new Set(['artists', 'albums', 'singles', 'libros']);
+const FLAT_CATS = ['armonia','melodia','ritmo','sound','vocals','bass','pads','drops','drums','arrangement','process','sampling','misc','career','plugins','sp404','microkorg'];
+const FOLDERS_KEY = 'hub_folders';
+
+const catLabels = {
+  armonia: 'Armonía', melodia: 'Melodía', ritmo: 'Ritmo', sound: 'Sound',
+  vocals: 'Vocals', bass: 'Bass', pads: 'Pads / Chords',
+  drops: 'Drops / Hooks', drums: 'Drums', arrangement: 'Arrangement',
+  process: 'Process', sampling: 'Sampling', misc: 'Misc.', career: 'Career', artists: 'Artists',
+  albums: 'Albums', singles: 'Singles', libros: 'Libros',
+  plugins: 'Plugins', sp404: 'SP404', microkorg: 'MicroKorg', discovery: 'Discovery', 'agents-doc': 'Agents'
+};
+
+function getCats(t) {
+  if (Array.isArray(t.categorias)) return t.categorias;
+  if (t.categoria) return [t.categoria];
+  return [];
+}
+
+function getTricks() {
+  try { return JSON.parse(lsGet(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveTricks(arr) {
+  const ok = lsSet(STORAGE_KEY, JSON.stringify(arr));
+  syncPush(STORAGE_KEY);
+  return ok;
+}
+
+// ── Folders (Reference hierarchy) ──
+function getFolders() {
+  try { return JSON.parse(lsGet(FOLDERS_KEY)) || []; }
+  catch { return []; }
+}
+function saveFolders(arr) {
+  const ok = lsSet(FOLDERS_KEY, JSON.stringify(arr));
+  syncPush(FOLDERS_KEY);
+  return ok;
+}
+function folderById(id) { return getFolders().find(f => f.id === id) || null; }
+function childFolders(parentId, type) {
+  return getFolders().filter(f => f.parentId === parentId && (!type || f.type === type));
+}
+function cardsInFolder(folderId) {
+  return getTricks().filter(t => t.folderId === folderId);
+}
+function folderPath(id) {
+  const path = [];
+  let f = folderById(id);
+  while (f) { path.unshift(f); f = f.parentId ? folderById(f.parentId) : null; }
+  return path;
+}
+function folderOptionsHtml(selectedId) {
+  const secLabel = { artist: 'Artists', album: 'Albums', single: 'Singles', libro: 'Libros' };
+  let html = `<option value="">— Ninguna —</option>`;
+  ['artist','album','single','libro'].forEach(type => {
+    getFolders().filter(f => f.type === type).sort((a,b) => a.name.localeCompare(b.name)).forEach(f => {
+      html += `<option value="${f.id}"${f.id === selectedId ? ' selected' : ''}>${esc(secLabel[type])} / ${esc(f.name)}</option>`;
+    });
+  });
+  return html;
+}
+
+// ── Image compression ──
+function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 900;
+        let w = img.width, h = img.height;
+        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function setupImgPicker(inputEl, previewEl, labelEl, removeEl, onSet) {
+  inputEl.addEventListener('change', async e => {
+    if (!e.target.files[0]) return;
+    const b64 = await compressImage(e.target.files[0]);
+    previewEl.src = b64;
+    previewEl.classList.add('visible');
+    labelEl.style.display = 'none';
+    removeEl.classList.add('visible');
+    onSet(b64);
+    e.target.value = '';
+  });
+  removeEl.addEventListener('click', e => {
+    e.stopPropagation();
+    previewEl.src = '';
+    previewEl.classList.remove('visible');
+    labelEl.style.display = '';
+    removeEl.classList.remove('visible');
+    onSet('');
+  });
+}
+
+function truncate(s, n) {
+  s = String(s || '');
+  return s.length > n ? s.slice(0, n).trimEnd() + '…' : s;
+}
+
+// Inline images in card body via tokens like [[img:ID]]
+function stripImgTokens(s) {
+  return String(s || '').replace(/\[\[img:[^\]]+\]\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+function renderBodyHTML(body, imgs) {
+  const map = {};
+  (imgs || []).forEach(im => { map[im.id] = im.src; });
+  const parts = String(body || '').split(/(\[\[img:[^\]]+\]\])/g);
+  return parts.map(p => {
+    const m = p.match(/^\[\[img:([^\]]+)\]\]$/);
+    if (m) { const src = map[m[1]]; return src ? `<img class="inline-img" src="${escAttr(src)}">` : ''; }
+    return esc(p);
+  }).join('');
+}
+function insertAtCaret(textarea, text) {
+  const s = textarea.selectionStart != null ? textarea.selectionStart : textarea.value.length;
+  const e = textarea.selectionEnd != null ? textarea.selectionEnd : s;
+  textarea.value = textarea.value.slice(0, s) + text + textarea.value.slice(e);
+  const pos = s + text.length;
+  textarea.selectionStart = textarea.selectionEnd = pos;
+  textarea.focus();
+}
+function htmlToText(html) { const d = document.createElement('div'); d.innerHTML = html || ''; return d.textContent || ''; }
+function bodyToInitialHTML(t) {
+  if (t.bodyHtml) return t.bodyHtml;
+  return renderBodyHTML(t.cuerpo, t.inlineImages).replace(/\n/g, '<br>');
+}
+
+// ── Notion-like rich text editor ──
+function makeRichEditor(initialHtml) {
+  const wrap = document.createElement('div');
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'rt-toolbar';
+  toolbar.innerHTML = `
+    <button type="button" class="rt-tb-btn" data-cmd="bold" title="Negrita"><b>B</b></button>
+    <button type="button" class="rt-tb-btn" data-cmd="italic" title="Cursiva"><i>I</i></button>
+    <button type="button" class="rt-tb-btn" data-cmd="insertUnorderedList" title="Lista">•</button>
+    <button type="button" class="rt-tb-btn" data-cmd="image" title="Imagen">🖼</button>`;
+
+  const editor = document.createElement('div');
+  editor.className = 'rt-editor';
+  editor.contentEditable = 'true';
+  editor.dataset.placeholder = 'Escribe…  ( escribe / para comandos )';
+  editor.innerHTML = initialHtml || '';
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
+
+  const slash = document.createElement('div');
+  slash.className = 'rt-slash'; slash.style.display = 'none';
+
+  wrap.appendChild(toolbar); wrap.appendChild(editor); wrap.appendChild(fileInput); wrap.appendChild(slash);
+
+  const exec = cmd => { editor.focus(); document.execCommand(cmd, false, null); };
+
+  let savedRange = null;
+  const saveRange = () => { const s = window.getSelection(); if (s.rangeCount) savedRange = s.getRangeAt(0).cloneRange(); };
+  const restoreRange = () => { if (savedRange) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); } };
+
+  function insertImageFromFile() { saveRange(); fileInput.value = ''; fileInput.click(); }
+  fileInput.addEventListener('change', async e => {
+    if (!e.target.files[0]) return;
+    const b64 = await compressImage(e.target.files[0]);
+    editor.focus(); restoreRange();
+    document.execCommand('insertHTML', false, `<img src="${b64}"><p><br></p>`);
+    e.target.value = '';
+  });
+
+  toolbar.querySelectorAll('.rt-tb-btn').forEach(btn => {
+    btn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const cmd = btn.dataset.cmd;
+      if (cmd === 'image') insertImageFromFile(); else exec(cmd);
+    });
+  });
+
+  const ITEMS = [
+    { key: 'imagen',  l: 'Imagen',  h: 'Subir una imagen', run: insertImageFromFile },
+    { key: 'lista',   l: 'Lista',   h: 'Viñetas',          run: () => exec('insertUnorderedList') },
+    { key: 'negrita', l: 'Negrita', h: 'Texto en negrita', run: () => exec('bold') },
+    { key: 'cursiva', l: 'Cursiva', h: 'Texto en cursiva', run: () => exec('italic') }
+  ];
+  let slashOpen = false, slashIdx = 0, slashCtx = null, filtered = [];
+
+  function getSlashContext() {
+    const sel = window.getSelection(); if (!sel.rangeCount) return null;
+    const r = sel.getRangeAt(0); if (!r.collapsed) return null;
+    const node = r.startContainer; if (node.nodeType !== 3) return null;
+    const text = node.textContent.slice(0, r.startOffset);
+    const m = text.match(/\/([\w]*)$/); if (!m) return null;
+    const before = m.index > 0 ? text[m.index - 1] : '';
+    if (before && !/\s/.test(before)) return null;
+    return { node, start: m.index, end: r.startOffset, query: m[1].toLowerCase() };
+  }
+  function positionSlash() {
+    const sel = window.getSelection(); if (!sel.rangeCount) return;
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    slash.style.left = rect.left + 'px';
+    slash.style.top = (rect.bottom + 6) + 'px';
+  }
+  function renderSlash() {
+    slash.innerHTML = filtered.map((it, i) => `<div class="rt-slash-item${i === slashIdx ? ' active' : ''}" data-i="${i}"><span class="l">${it.l}</span><span class="h">${it.h}</span></div>`).join('');
+    slash.querySelectorAll('.rt-slash-item').forEach(el => el.addEventListener('mousedown', e => { e.preventDefault(); pickSlash(parseInt(el.dataset.i)); }));
+  }
+  function openSlash(ctx) {
+    slashCtx = ctx; slashIdx = 0;
+    filtered = ITEMS.filter(it => !ctx.query || it.key.startsWith(ctx.query) || it.l.toLowerCase().startsWith(ctx.query));
+    if (!filtered.length) { closeSlash(); return; }
+    slashOpen = true; slash.style.display = 'block'; positionSlash(); renderSlash();
+  }
+  function closeSlash() { slashOpen = false; slash.style.display = 'none'; slashCtx = null; }
+  function removeSlashText() {
+    if (!slashCtx) return;
+    try {
+      const r = document.createRange();
+      r.setStart(slashCtx.node, slashCtx.start);
+      r.setEnd(slashCtx.node, slashCtx.end);
+      r.deleteContents();
+      const sel = window.getSelection(); sel.removeAllRanges();
+      const r2 = document.createRange(); r2.setStart(slashCtx.node, slashCtx.start); r2.collapse(true); sel.addRange(r2);
+    } catch (_) {}
+  }
+  function pickSlash(i) { const it = filtered[i]; if (!it) return; removeSlashText(); closeSlash(); it.run(); }
+
+  editor.addEventListener('input', () => { const ctx = getSlashContext(); if (ctx) openSlash(ctx); else closeSlash(); });
+  editor.addEventListener('keydown', e => {
+    if (!slashOpen) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); slashIdx = (slashIdx + 1) % filtered.length; renderSlash(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); slashIdx = (slashIdx - 1 + filtered.length) % filtered.length; renderSlash(); }
+    else if (e.key === 'Enter') { e.preventDefault(); pickSlash(slashIdx); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeSlash(); }
+  });
+  editor.addEventListener('blur', () => setTimeout(closeSlash, 150));
+
+  return { wrap, editor, getHTML: () => editor.innerHTML, getText: () => editor.textContent };
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+function escAttr(s) {
+  return String(s || '').replace(/"/g, '&quot;');
+}
+
+function getGridTrackDefs(t) {
+  if (t.gridType === 'melody') return GRID_TRACK_DEFS.melody;
+  if (t.gridType === 'chords') {
+    const n = Math.min(5, Math.max(3, parseInt(t.numNotes) || 3));
+    return GRID_TRACK_DEFS.chords.slice(5 - n);
+  }
+  return GRID_TRACK_DEFS.drums;
+}
+
+function makePaintableGrid(trackDefs, patterns, steps, stepsPerBar, onPaint, readonly) {
+  const cellW = `minmax(6px, 1fr)`;
+  const cols  = `repeat(${steps}, ${cellW})`;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'grid-wrapper' + (readonly ? ' grid-readonly' : '');
+
+  // ruler
+  const ruler = document.createElement('div');
+  ruler.className = 'grid-ruler';
+  const rulerPad = document.createElement('div');
+  rulerPad.className = 'grid-ruler-pad';
+  const rulerCells = document.createElement('div');
+  rulerCells.className = 'grid-ruler-cells';
+  rulerCells.style.gridTemplateColumns = cols;
+  for (let s = 0; s < steps; s++) {
+    const bar       = Math.floor(s / stepsPerBar) + 1;
+    const sub       = (s % stepsPerBar) + 1;
+    const isBarStart = s % stepsPerBar === 0;
+    const rc = document.createElement('span');
+    rc.className = 'ruler-cell ' + (isBarStart ? 'rbar' : 'rbeat') + (isBarStart && s > 0 ? ' beat-1' : '');
+    rc.textContent = isBarStart ? String(bar) : `${bar}.${sub}`;
+    rulerCells.appendChild(rc);
+  }
+  ruler.appendChild(rulerPad);
+  ruler.appendChild(rulerCells);
+  wrapper.appendChild(ruler);
+
+  trackDefs.forEach((def, ti) => {
+    const row = document.createElement('div');
+    row.className = `grid-track ${def.cls}`;
+    const lbl = document.createElement('div');
+    lbl.className = 'grid-track-label';
+    lbl.textContent = def.name;
+    const cellsDiv = document.createElement('div');
+    cellsDiv.className = 'grid-cells';
+    cellsDiv.style.gridTemplateColumns = cols;
+    for (let s = 0; s < steps; s++) {
+      const cell = document.createElement('div');
+      const isBeat = s > 0 && s % stepsPerBar === 0;
+      cell.className = 'grid-cell' + (patterns[ti][s] ? ' on' : '') + (isBeat ? ' beat-1' : '');
+      if (!readonly) {
+        cell.addEventListener('mousedown', e => {
+          e.preventDefault();
+          gPainting = true;
+          gPaintVal = patterns[ti][s] ? 0 : 1;
+          patterns[ti][s] = gPaintVal;
+          cell.classList.toggle('on', gPaintVal === 1);
+          if (onPaint) onPaint();
+        });
+        cell.addEventListener('mouseenter', () => {
+          if (!gPainting || patterns[ti][s] === gPaintVal) return;
+          patterns[ti][s] = gPaintVal;
+          cell.classList.toggle('on', gPaintVal === 1);
+          if (onPaint) onPaint();
+        });
+      }
+      cellsDiv.appendChild(cell);
+    }
+    row.appendChild(lbl);
+    row.appendChild(cellsDiv);
+    wrapper.appendChild(row);
+  });
+  return wrapper;
+}
+
+function buildGridCard(t) {
+  const div = document.createElement('div');
+  div.className = 'card card-grid-type';
+  const spb      = RES_SPB[t.resolution] || 16;
+  const steps    = BARS * spb;
+  const trackDefs = getGridTrackDefs(t);
+
+  const patterns = trackDefs.map((_, ti) => {
+    const src = (t.tracks && t.tracks[ti] && t.tracks[ti].pattern) || [];
+    return [...src, ...new Array(steps).fill(0)].slice(0, steps);
+  });
+
+  function savePatterns() {
+    const all = getTricks();
+    const idx = all.findIndex(x => x.id === t.id);
+    if (idx < 0) return;
+    all[idx].tracks = patterns.map(p => ({ pattern: [...p] }));
+    saveTricks(all);
+  }
+
+  // ── View (read-only preview; click opens edit modal) ──
+  const view = document.createElement('div');
+  view.className = 'card-view';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'card-title';
+  titleEl.textContent = t.titulo || '';
+
+  const metaEl = document.createElement('div');
+  metaEl.className = 'grid-card-meta';
+  metaEl.innerHTML = `<span class="grid-badge-type">${t.gridType||'grid'}</span><span class="grid-badge-res">${t.resolution||'1/16'}</span><span class="grid-badge-steps">${steps} steps</span>`;
+
+  const previewGrid = document.createElement('div');
+  previewGrid.appendChild(makePaintableGrid(trackDefs, patterns, steps, spb, null, true));
+
+  const tagsEl = document.createElement('div');
+  tagsEl.className = 'card-tags';
+  tagsEl.innerHTML = (t.tags||[]).filter(Boolean).map(tag => `<span class="tag">${esc(tag)}</span>`).join('');
+
+  view.appendChild(titleEl);
+  view.appendChild(metaEl);
+  view.appendChild(previewGrid);
+  view.appendChild(tagsEl);
+  div.appendChild(view);
+
+  // ── Edit modal content ──
+  function savePainted() { savePatterns(); modalNeedsRender = true; }
+
+  function buildEditModal() {
+    const edit = document.createElement('div');
+    edit.className = 'card-edit active';
+
+    const header = document.createElement('div');
+    header.className = 'edit-modal-title';
+    header.textContent = 'Editar grid';
+
+    const metaClone = document.createElement('div');
+    metaClone.className = 'grid-card-meta';
+    metaClone.innerHTML = metaEl.innerHTML;
+
+    const gridContainer = document.createElement('div');
+    gridContainer.appendChild(makePaintableGrid(trackDefs, patterns, steps, spb, savePainted, false));
+
+    const midiRow = document.createElement('div');
+    midiRow.style.cssText = 'display:flex; gap:8px; margin-top:4px;';
+    midiRow.innerHTML = `
+      <button class="btn btn-ghost btn-midi-in">↑ Importar MIDI</button>
+      <button class="btn btn-ghost btn-midi-out">↓ Exportar MIDI</button>`;
+
+    const fields = document.createElement('div');
+    fields.innerHTML = `
+      <div class="edit-field"><div class="edit-label">Título</div><input class="edit-input gedit-titulo" value="${escAttr(t.titulo)}"></div>
+      <div class="edit-field"><div class="edit-label">Tags</div><input class="edit-input gedit-tags" value="${escAttr((t.tags||[]).join(', '))}"></div>
+      <div class="edit-field"><div class="edit-label">Carpeta</div><select class="edit-input gedit-folder">${folderOptionsHtml(t.folderId)}</select></div>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'edit-actions with-delete';
+    actions.innerHTML = `
+      <button class="btn btn-danger btn-delete-edit">Eliminar</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-cancel-edit">Cancelar</button>
+        <button class="btn btn-outline btn-save-edit">Guardar</button>
+      </div>`;
+
+    edit.appendChild(header);
+    edit.appendChild(metaClone);
+    edit.appendChild(gridContainer);
+    edit.appendChild(midiRow);
+    edit.appendChild(fields);
+    edit.appendChild(actions);
+
+    // MIDI export
+    midiRow.querySelector('.btn-midi-out').addEventListener('click', () => {
+      const safe = (t.titulo||'grid').replace(/[^a-z0-9]/gi,'-').toLowerCase();
+      downloadMIDI(generateMIDI(patterns, t.gridType, t.resolution), `${safe}.mid`);
+    });
+    // MIDI import
+    midiRow.querySelector('.btn-midi-in').addEventListener('click', () => {
+      pickMIDIFile(buffer => {
+        const parsed = parseMIDIBuffer(buffer);
+        if (!parsed) { alert('No se pudo leer el archivo MIDI.'); return; }
+        const numNotes = parseInt(t.numNotes)||3;
+        const newPats  = midiToGrid(parsed.noteOns, parsed.ppq, t.resolution, t.gridType, numNotes, steps);
+        newPats.forEach((p, ti) => { if (ti < patterns.length) patterns[ti] = p; });
+        gridContainer.innerHTML = '';
+        gridContainer.appendChild(makePaintableGrid(trackDefs, patterns, steps, spb, savePainted, false));
+        savePainted();
+      });
+    });
+
+    actions.querySelector('.btn-delete-edit').addEventListener('click', () => {
+      if (!confirm('¿Borrar esta card?')) return;
+      saveTricks(getTricks().filter(x => x.id !== t.id));
+      modalNeedsRender = true;
+      closeCardModal();
+    });
+    actions.querySelector('.btn-cancel-edit').addEventListener('click', () => swapCardModal(buildDetailModal()));
+    actions.querySelector('.btn-save-edit').addEventListener('click', () => {
+      const titulo = edit.querySelector('.gedit-titulo').value.trim();
+      if (!titulo) return;
+      const tags = edit.querySelector('.gedit-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+      const folderId = edit.querySelector('.gedit-folder').value || null;
+      const all = getTricks();
+      const idx = all.findIndex(x => x.id === t.id);
+      if (idx >= 0) { all[idx].titulo = titulo; all[idx].tags = tags; all[idx].folderId = folderId; saveTricks(all); }
+      modalNeedsRender = true;
+      closeCardModal();
+    });
+
+    return edit;
+  }
+
+  // ── Detail modal content (read-only, with Editar button) ──
+  function buildDetailModal() {
+    const detail = document.createElement('div');
+    detail.className = 'card-detail';
+
+    const h = document.createElement('div');
+    h.className = 'detail-title';
+    h.textContent = t.titulo || '';
+
+    const metaClone = document.createElement('div');
+    metaClone.className = 'grid-card-meta';
+    metaClone.innerHTML = metaEl.innerHTML;
+
+    const gridPrev = document.createElement('div');
+    gridPrev.appendChild(makePaintableGrid(trackDefs, patterns, steps, spb, null, true));
+
+    const tagsClone = document.createElement('div');
+    tagsClone.className = 'card-tags';
+    tagsClone.innerHTML = tagsEl.innerHTML;
+
+    const acts = document.createElement('div');
+    acts.className = 'detail-actions';
+    acts.innerHTML = `<button class="btn btn-outline btn-go-edit">Editar</button>`;
+    acts.querySelector('.btn-go-edit').addEventListener('click', () => swapCardModal(buildEditModal()));
+
+    detail.appendChild(h);
+    detail.appendChild(metaClone);
+    detail.appendChild(gridPrev);
+    detail.appendChild(tagsClone);
+    detail.appendChild(acts);
+    return detail;
+  }
+
+  div.addEventListener('click', () => openCardModal(buildDetailModal()));
+
+  return div;
+}
+
+function render() {
+  if (currentCat === 'agents-doc') {
+    document.getElementById('subtabs').classList.add('hidden');
+    document.getElementById('subtabs2').classList.add('hidden');
+    renderAgentsDoc();
+    return;
+  }
+
+  if (currentCat === 'discovery') {
+    document.getElementById('subtabs').classList.add('hidden');
+    document.getElementById('subtabs2').classList.add('hidden');
+    renderDiscovery();
+    return;
+  }
+
+  if (REFCATS.has(currentCat)) {
+    document.getElementById('subtabs').classList.add('hidden');
+    document.getElementById('subtabs2').classList.add('hidden');
+    renderReference();
+    return;
+  }
+
+  if (currentCat === 'plugins') {
+    renderPlugins();
+    return;
+  }
+
+  const area = document.getElementById('content-area');
+  area.className = 'cards-area';
+  area.innerHTML = '<div class="cards-grid" id="cards-grid"></div>';
+  const grid = document.getElementById('cards-grid');
+
+  // Show/hide + build subtabs
+  const subtabsEl = document.getElementById('subtabs');
+  if (SUBCATTED.has(currentCat)) {
+    const defs = subcatsFor(currentCat);
+    if (!defs.some(s => s.v === currentSubcat)) currentSubcat = defs[0].v;
+    subtabsEl.classList.remove('hidden');
+    subtabsEl.innerHTML = defs.map(s =>
+      `<button class="subtab${s.v === currentSubcat ? ' active' : ''}" data-sub="${s.v}">${s.l}</button>`
+    ).join('');
+    subtabsEl.querySelectorAll('.subtab').forEach(btn => {
+      btn.addEventListener('click', () => { currentSubcat = btn.dataset.sub; currentSubsub = 'all'; render(); });
+    });
+  } else {
+    subtabsEl.classList.add('hidden');
+  }
+
+  // Third-level tabs (e.g. Plugins > Efectos)
+  const subtabs2El = document.getElementById('subtabs2');
+  const subsubs = SUBCATTED.has(currentCat) ? subsubsFor(currentCat, currentSubcat) : null;
+  if (subsubs) {
+    if (currentSubsub !== 'all' && !subsubs.includes(currentSubsub)) currentSubsub = 'all';
+    subtabs2El.classList.remove('hidden');
+    const opts = ['all', ...subsubs];
+    subtabs2El.innerHTML = opts.map(v =>
+      `<button class="subtab${v === currentSubsub ? ' active' : ''}" data-ss="${v}">${v === 'all' ? 'Todos' : v}</button>`
+    ).join('');
+    subtabs2El.querySelectorAll('.subtab').forEach(btn => {
+      btn.addEventListener('click', () => { currentSubsub = btn.dataset.ss; render(); });
+    });
+  } else {
+    subtabs2El.classList.add('hidden');
+  }
+
+  let tricks = getTricks().filter(t => getCats(t).includes(currentCat));
+
+  // Filter by sub-tab
+  if (SUBCATTED.has(currentCat)) {
+    const def = defaultSubcat(currentCat);
+    tricks = tricks.filter(t => (t.subcategoria || def) === currentSubcat);
+  }
+  // Filter by third-level
+  if (subsubs && currentSubsub !== 'all') {
+    tricks = tricks.filter(t => t.subtype === currentSubsub);
+  }
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    tricks = tricks.filter(t =>
+      (t.titulo || '').toLowerCase().includes(q) ||
+      (t.cuerpo || '').toLowerCase().includes(q) ||
+      (t.tags || []).some(tag => tag.toLowerCase().includes(q))
+    );
+  }
+
+  tricks = shuffle(tricks);
+
+  if (tricks.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        Sin cards todavía en esta categoría.<br>
+        Pulsa <strong style="color:#aaa">+ Nueva card</strong> para añadir una,<br>
+        o <strong style="color:#aaa">Importar JSON</strong> y selecciona el archivo de<br>
+        <code>Hub_Library/${currentCat}.json</code>
+      </div>`;
+    return;
+  }
+
+  tricks.forEach(t => grid.appendChild(buildCard(t)));
+}
+
+// ── Reference (folder hierarchy) ──
+function renderReference() {
+  const area = document.getElementById('content-area');
+  area.className = 'cards-area';
+  area.innerHTML = '';
+
+  const folder = currentFolder ? folderById(currentFolder) : null;
+  if (currentFolder && !folder) { currentFolder = null; } // stale id
+
+  // Breadcrumb + actions bar
+  const bar = document.createElement('div');
+  bar.className = 'ref-bar';
+
+  const crumb = document.createElement('div');
+  crumb.className = 'breadcrumb';
+  const rootLabel = catLabels[currentCat];
+  const rootCrumb = `<span class="crumb${folder ? '' : ' current'}" data-go="root">${rootLabel}</span>`;
+  let crumbHtml = rootCrumb;
+  if (folder) {
+    folderPath(folder.id).forEach((f, i, arr) => {
+      crumbHtml += `<span class="crumb-sep">/</span>`;
+      crumbHtml += `<span class="crumb${i === arr.length-1 ? ' current' : ''}" data-go="${f.id}">${esc(f.name)}</span>`;
+    });
+  }
+  crumb.innerHTML = crumbHtml;
+
+  const sectionType = currentCat === 'artists' ? 'artist' : currentCat === 'albums' ? 'album' : currentCat === 'libros' ? 'libro' : 'single';
+
+  const actions = document.createElement('div');
+  actions.className = 'ref-actions';
+  if (!folder) {
+    actions.innerHTML = `<button class="btn btn-outline" data-add="${sectionType}">+ Crear carpeta</button>`;
+  } else {
+    actions.innerHTML = `
+      <button class="btn btn-ghost" id="ref-edit-folder">Edit folder</button>
+      <button class="btn btn-ghost" id="ref-new-grid">+ Grid</button>
+      <button class="btn btn-outline" id="ref-new-card">+ Card</button>`;
+  }
+
+  bar.appendChild(crumb);
+  bar.appendChild(actions);
+  area.appendChild(bar);
+
+  // Wire breadcrumb
+  crumb.querySelectorAll('.crumb[data-go]').forEach(el => {
+    el.addEventListener('click', () => {
+      const go = el.dataset.go;
+      currentFolder = (go === 'root') ? null : go;
+      render();
+    });
+  });
+  // Wire add buttons
+  actions.querySelectorAll('[data-add]').forEach(btn => {
+    btn.addEventListener('click', () => openFolderModal(btn.dataset.add, folder ? folder.id : null));
+  });
+  const refEditFolder = actions.querySelector('#ref-edit-folder');
+  if (refEditFolder && folder) refEditFolder.addEventListener('click', () => openFolderModal(folder.type, folder.parentId, folder, folder.scope));
+  const refNewCard = actions.querySelector('#ref-new-card');
+  const refNewGrid = actions.querySelector('#ref-new-grid');
+  if (refNewCard) refNewCard.addEventListener('click', () => { newFolderId = currentFolder; openModal('texto'); });
+  if (refNewGrid) refNewGrid.addEventListener('click', () => { newFolderId = currentFolder; openModal('grid'); });
+
+  const filterBySearch = arr => {
+    if (!searchQuery) return arr;
+    const q = searchQuery.toLowerCase();
+    return arr.filter(t =>
+      (t.titulo||'').toLowerCase().includes(q) ||
+      (t.cuerpo||'').toLowerCase().includes(q) ||
+      (t.tags||[]).some(tag => tag.toLowerCase().includes(q)));
+  };
+
+  // ── Content ──
+  if (!folder) {
+    // Root: list folders of this section
+    const folders = getFolders().filter(f => f.type === sectionType)
+      .sort((a,b) => a.name.localeCompare(b.name));
+    if (folders.length) {
+      const fg = document.createElement('div');
+      fg.className = 'folder-grid';
+      folders.forEach(f => fg.appendChild(buildFolderTile(f)));
+      area.appendChild(fg);
+    }
+
+    // Loose cards: tagged with this section but not yet in a folder (legacy / sin carpeta)
+    let loose = filterBySearch(getTricks().filter(t => !t.folderId && getCats(t).includes(currentCat)));
+    if (loose.length) {
+      const lbl = document.createElement('div');
+      lbl.className = 'ref-section-label';
+      lbl.textContent = 'Sin carpeta';
+      area.appendChild(lbl);
+      const grid = document.createElement('div');
+      grid.className = 'cards-grid';
+      loose.forEach(t => grid.appendChild(buildCard(t)));
+      area.appendChild(grid);
+    }
+
+    if (!folders.length && !loose.length) {
+      const empty = document.createElement('div');
+      empty.className = 'ref-empty';
+      empty.textContent = `Sin carpetas todavía. Pulsa “+ Crear carpeta” para empezar.`;
+      area.appendChild(empty);
+    }
+    return;
+  }
+
+  // Inside a folder: just its cards
+  const cards = filterBySearch(cardsInFolder(folder.id));
+  if (cards.length) {
+    const grid = document.createElement('div');
+    grid.className = 'cards-grid';
+    cards.forEach(t => grid.appendChild(buildCard(t)));
+    area.appendChild(grid);
+  } else {
+    const empty = document.createElement('div');
+    empty.className = 'ref-empty';
+    empty.textContent = 'Carpeta vacía. Añade una card con “+ Card” o “+ Grid”.';
+    area.appendChild(empty);
+  }
+}
+
+function plugColor(s) {
+  let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const hue = h % 360;
+  return { a: `hsl(${hue},42%,34%)`, b: `hsl(${(hue + 28) % 360},40%,20%)` };
+}
+function plugInitials(s) {
+  const w = s.replace(/[^A-Za-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+  if (w.length >= 2) return (w[0][0] + w[1][0]).toUpperCase();
+  return (w[0] || s).slice(0, 2).toUpperCase();
+}
+
+function buildFolderTile(f) {
+  const tile = document.createElement('div');
+  tile.className = 'folder-tile';
+  const cardCount = cardsInFolder(f.id).length;
+  const icon = { artist: '♪', album: '◉', single: '♫', libro: '▤', plugin: '▣' }[f.type] || '♪';
+  let cover;
+  if (f.imagen) {
+    cover = `<img class="folder-cover" src="${escAttr(f.imagen)}" alt="">`;
+  } else if (f.type === 'plugin') {
+    const c = plugColor(f.name);
+    cover = `<div class="folder-cover-empty" style="background:linear-gradient(140deg,${c.a},${c.b});color:#fff;font-size:23px;font-weight:700;letter-spacing:0.01em;">${esc(plugInitials(f.name))}</div>`;
+  } else {
+    cover = `<div class="folder-cover-empty">${icon}</div>`;
+  }
+  tile.innerHTML = `
+    ${cover}
+    <div class="folder-info">
+      <div class="folder-name">${esc(f.name)}</div>
+      ${f.desc ? `<div class="folder-desc">${esc(f.desc)}</div>` : ''}
+      <div class="folder-meta">${cardCount} card${cardCount!==1?'s':''}</div>
+      <button class="folder-edit-btn">editar</button>
+    </div>`;
+  tile.addEventListener('click', e => {
+    if (e.target.closest('.folder-edit-btn')) { openFolderModal(f.type, f.parentId, f, f.scope); return; }
+    currentFolder = f.id;
+    render();
+  });
+  return tile;
+}
+
+// ── Folder create / edit modal (reuses generic card modal box) ──
+function openFolderModal(type, parentId, existing, scope) {
+  const typeLabel = type === 'artist' ? 'artista' : type === 'album' ? 'album' : type === 'single' ? 'single' : type === 'libro' ? 'libro' : 'plugin';
+  let imagen = existing ? (existing.imagen || '') : '';
+
+  const el = document.createElement('div');
+  el.className = 'card-edit active';
+  el.innerHTML = `
+    <div class="edit-modal-title">${existing ? 'Editar' : 'Nuevo'} ${typeLabel}</div>
+    <div class="edit-field">
+      <div class="edit-label">Nombre</div>
+      <input class="edit-input fol-name" value="${existing ? escAttr(existing.name) : ''}" placeholder="Nombre del ${typeLabel}">
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Descripción <span style="color:#444">(opcional)</span></div>
+      <input class="edit-input fol-desc" value="${existing ? escAttr(existing.desc || '') : ''}" placeholder="Subtítulo corto">
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Portada <span style="color:#444">(opcional)</span></div>
+      <div class="img-picker-zone">
+        <input type="file" accept="image/*" class="fol-img-input">
+        <img class="img-picker-preview ${imagen ? 'visible' : ''}" src="${escAttr(imagen)}">
+        <div class="img-picker-label" style="${imagen ? 'display:none' : ''}">Haz clic para añadir portada</div>
+        <button class="img-remove ${imagen ? 'visible' : ''}">Quitar</button>
+      </div>
+    </div>
+    <div class="edit-actions ${existing ? 'with-delete' : ''}">
+      ${existing ? '<button class="btn btn-danger fol-delete">Eliminar</button>' : ''}
+      <div style="display:flex; gap:8px; ${existing ? '' : 'margin-left:auto;'}">
+        <button class="btn btn-ghost fol-cancel">Cancelar</button>
+        <button class="btn btn-outline fol-save">Guardar</button>
+      </div>
+    </div>`;
+
+  setupImgPicker(
+    el.querySelector('.fol-img-input'),
+    el.querySelector('.img-picker-preview'),
+    el.querySelector('.img-picker-label'),
+    el.querySelector('.img-remove'),
+    b64 => { imagen = b64; }
+  );
+
+  el.querySelector('.fol-cancel').addEventListener('click', () => closeCardModal());
+  el.querySelector('.fol-save').addEventListener('click', () => {
+    const name = el.querySelector('.fol-name').value.trim();
+    if (!name) { alert('El nombre es obligatorio.'); return; }
+    const desc = el.querySelector('.fol-desc').value.trim();
+    const folders = getFolders();
+    if (existing) {
+      const idx = folders.findIndex(f => f.id === existing.id);
+      if (idx >= 0) { folders[idx] = { ...folders[idx], name, desc, imagen }; saveFolders(folders); }
+    } else {
+      const nf = { id: `fol_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, type, name, desc, parentId: parentId || null, imagen };
+      if (type === 'plugin') nf.scope = scope || '';
+      folders.push(nf);
+      saveFolders(folders);
+    }
+    modalNeedsRender = true;
+    closeCardModal();
+  });
+  const delBtn = el.querySelector('.fol-delete');
+  if (delBtn) delBtn.addEventListener('click', () => {
+    const sub = childFolders(existing.id).length;
+    const crd = cardsInFolder(existing.id).length;
+    const extra = (sub || crd) ? `\n\nContiene ${sub} carpeta(s) y ${crd} card(s); también se borrarán.` : '';
+    if (!confirm(`¿Borrar “${existing.name}”?${extra}`)) return;
+    deleteFolderDeep(existing.id);
+    if (currentFolder === existing.id) currentFolder = existing.parentId || null;
+    modalNeedsRender = true;
+    closeCardModal();
+  });
+
+  openCardModal(el);
+}
+
+function deleteFolderDeep(id) {
+  const folders = getFolders();
+  const toDelete = new Set([id]);
+  // collect descendants
+  let changed = true;
+  while (changed) {
+    changed = false;
+    folders.forEach(f => {
+      if (f.parentId && toDelete.has(f.parentId) && !toDelete.has(f.id)) { toDelete.add(f.id); changed = true; }
+    });
+  }
+  saveFolders(folders.filter(f => !toDelete.has(f.id)));
+  // delete cards in any deleted folder
+  saveTricks(getTricks().filter(t => !toDelete.has(t.folderId)));
+}
+
+// ── Plugins (folder-based: each plugin is a folder of learning cards) ──
+function renderPlugins() {
+  const subtabsEl  = document.getElementById('subtabs');
+  const subtabs2El = document.getElementById('subtabs2');
+  const area = document.getElementById('content-area');
+  area.className = 'cards-area';
+
+  const filterBySearch = arr => {
+    if (!searchQuery) return arr;
+    const q = searchQuery.toLowerCase();
+    return arr.filter(t =>
+      (t.titulo||'').toLowerCase().includes(q) ||
+      (t.cuerpo||'').toLowerCase().includes(q) ||
+      (t.tags||[]).some(tag => tag.toLowerCase().includes(q)));
+  };
+
+  const folder = currentFolder ? folderById(currentFolder) : null;
+  if (currentFolder && !folder) currentFolder = null;
+
+  // ── Inside a plugin folder: breadcrumb + its cards ──
+  if (folder && folder.type === 'plugin') {
+    subtabsEl.classList.add('hidden');
+    subtabs2El.classList.add('hidden');
+    area.innerHTML = '';
+
+    const parts = (folder.scope || '').split('/'); // ['plugins', subcat, subsub?]
+    const sc = parts[1] || '';
+    const ss = parts[2] || '';
+
+    const bar = document.createElement('div');
+    bar.className = 'ref-bar';
+    const crumb = document.createElement('div');
+    crumb.className = 'breadcrumb';
+    let html = `<span class="crumb" data-go="root">Plugins</span>`;
+    if (sc) html += `<span class="crumb-sep">/</span><span class="crumb" data-go="sc">${esc(subcatLabel('plugins', sc))}</span>`;
+    if (ss) html += `<span class="crumb-sep">/</span><span class="crumb" data-go="ss">${esc(ss)}</span>`;
+    html += `<span class="crumb-sep">/</span><span class="crumb current">${esc(folder.name)}</span>`;
+    crumb.innerHTML = html;
+
+    const actions = document.createElement('div');
+    actions.className = 'ref-actions';
+    actions.innerHTML = `
+      <button class="btn btn-ghost" id="ref-edit-folder">Edit folder</button>
+      <button class="btn btn-ghost" id="ref-new-grid">+ Grid</button>
+      <button class="btn btn-outline" id="ref-new-card">+ Card</button>`;
+
+    bar.appendChild(crumb); bar.appendChild(actions); area.appendChild(bar);
+
+    crumb.querySelector('[data-go="root"]').addEventListener('click', () => { currentFolder = null; currentSubcat = sc || defaultSubcat('plugins'); currentSubsub = 'all'; render(); });
+    const scEl = crumb.querySelector('[data-go="sc"]'); if (scEl) scEl.addEventListener('click', () => { currentFolder = null; currentSubcat = sc; currentSubsub = 'all'; render(); });
+    const ssEl = crumb.querySelector('[data-go="ss"]'); if (ssEl) ssEl.addEventListener('click', () => { currentFolder = null; currentSubcat = sc; currentSubsub = ss; render(); });
+    actions.querySelector('#ref-edit-folder').addEventListener('click', () => openFolderModal(folder.type, folder.parentId, folder, folder.scope));
+    actions.querySelector('#ref-new-card').addEventListener('click', () => { newFolderId = currentFolder; openModal('texto'); });
+    actions.querySelector('#ref-new-grid').addEventListener('click', () => { newFolderId = currentFolder; openModal('grid'); });
+
+    const cards = filterBySearch(cardsInFolder(folder.id));
+    if (cards.length) {
+      const grid = document.createElement('div');
+      grid.className = 'cards-grid';
+      cards.forEach(t => grid.appendChild(buildCard(t)));
+      area.appendChild(grid);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'ref-empty';
+      empty.textContent = 'Carpeta vacía. Añade una card con “+ Card” o “+ Grid”.';
+      area.appendChild(empty);
+    }
+    return;
+  }
+
+  // ── Navigation level ──
+  const defs = subcatsFor('plugins');
+  if (!defs.some(s => s.v === currentSubcat)) currentSubcat = defs[0].v;
+  subtabsEl.classList.remove('hidden');
+  subtabsEl.innerHTML = defs.map(s => `<button class="subtab${s.v === currentSubcat ? ' active' : ''}" data-sub="${s.v}">${s.l}</button>`).join('');
+  subtabsEl.querySelectorAll('.subtab').forEach(btn => btn.addEventListener('click', () => { currentSubcat = btn.dataset.sub; currentSubsub = 'all'; render(); }));
+
+  const subsubs = subsubsFor('plugins', currentSubcat);
+  const folderMatchesSearch = f => !searchQuery || f.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+  subtabs2El.classList.add('hidden');
+  area.innerHTML = '';
+
+  // ── KANBAN VIEW ──
+  const sections = subsubs
+    ? subsubs.map(ss => ({ title: ss, scope: `plugins/${currentSubcat}/${ss}` }))
+    : [{ title: subcatLabel('plugins', currentSubcat), scope: `plugins/${currentSubcat}` }];
+
+  const board = document.createElement('div');
+  board.className = 'kanban';
+  sections.forEach(sec => {
+    const rows = getFolders()
+      .filter(f => f.type === 'plugin' && f.scope === sec.scope && folderMatchesSearch(f))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    if (searchQuery && !rows.length) return; // hide empty sections while searching
+    const secEl = document.createElement('div');
+    secEl.className = 'kanban-section';
+    const title = document.createElement('div');
+    title.className = 'kanban-title';
+    title.textContent = sec.title;
+    secEl.appendChild(title);
+    rows.forEach(f => secEl.appendChild(buildKanbanRow(f)));
+    const add = document.createElement('div');
+    add.className = 'kanban-add';
+    add.textContent = '+ añadir plugin';
+    add.addEventListener('click', () => openFolderModal('plugin', null, null, sec.scope));
+    secEl.appendChild(add);
+    board.appendChild(secEl);
+  });
+  area.appendChild(board);
+}
+
+function buildKanbanRow(f) {
+  const row = document.createElement('div');
+  row.className = 'kanban-row';
+  let icon;
+  if (f.imagen) {
+    icon = `<img class="kanban-icon" src="${escAttr(f.imagen)}" alt="">`;
+  } else {
+    const c = plugColor(f.name);
+    icon = `<div class="kanban-icon" style="background:linear-gradient(140deg,${c.a},${c.b})">${esc(plugInitials(f.name))}</div>`;
+  }
+  row.innerHTML = `
+    ${icon}
+    <div class="kanban-row-text">
+      <div class="kanban-row-name">${esc(f.name)}</div>
+      ${f.desc ? `<div class="kanban-row-desc">${esc(f.desc)}</div>` : ''}
+    </div>`;
+  row.addEventListener('click', e => {
+    if (e.target.closest('.k-edit')) return;
+    currentFolder = f.id;
+    render();
+  });
+  return row;
+}
+
+function buildCard(t) {
+  if (t.tipo === 'grid') return buildGridCard(t);
+  const div = document.createElement('div');
+  div.className = 'card';
+
+  const tagsHtml = (t.tags || [])
+    .filter(Boolean)
+    .map(tag => `<span class="tag">${esc(tag)}</span>`)
+    .join('');
+
+  const linkHtml = t.link
+    ? `<a class="card-link" href="${escAttr(t.link)}" target="_blank">↗ ${esc(t.link)}</a>`
+    : '';
+
+  const imgHtml = t.imagen
+    ? `<img class="card-image" src="${escAttr(t.imagen)}" alt="">`
+    : '';
+
+  // Folder chip (foto + nombre) — solo si la card vive en un folder de Artists/Albums/Singles
+  const folder = t.folderId ? folderById(t.folderId) : null;
+  const folderChipHtml = (folder && folder.type !== 'plugin')
+    ? `<div class="card-folder-chip">${
+        folder.imagen
+          ? `<img src="${escAttr(folder.imagen)}" alt="">`
+          : `<span class="cf-ph">${({ artist: '♪', album: '◉', single: '♫', libro: '▤' })[folder.type] || '♪'}</span>`
+      }<span class="cf-name">${esc(folder.name)}</span></div>`
+    : '';
+
+  // Build preview section (click opens detail modal)
+  const view = document.createElement('div');
+  view.className = 'card-view';
+  const previewText = t.bodyHtml ? htmlToText(t.bodyHtml) : stripImgTokens(t.cuerpo);
+  view.innerHTML = `
+    ${folderChipHtml}
+    ${imgHtml}
+    <div class="card-title">${esc(t.titulo)}</div>
+    <div class="card-body">${esc(truncate(previewText, 230))}</div>
+    <div class="card-tags">${tagsHtml}</div>
+  `;
+
+  // Build detail section (full content, read-only, with Editar button)
+  const bodyDetailHtml = t.bodyHtml
+    ? `<div class="detail-body rich">${t.bodyHtml}</div>`
+    : `<div class="detail-body">${renderBodyHTML(t.cuerpo, t.inlineImages)}</div>`;
+  const detail = document.createElement('div');
+  detail.className = 'card-detail';
+  detail.innerHTML = `
+    ${folderChipHtml}
+    ${imgHtml}
+    <div class="detail-title">${esc(t.titulo)}</div>
+    ${bodyDetailHtml}
+    ${linkHtml}
+    <div class="card-tags">${tagsHtml}</div>
+    <div class="detail-actions">
+      <button class="btn btn-outline btn-go-edit">Editar</button>
+    </div>
+  `;
+
+  // Build edit section
+  let editImagen = t.imagen || '';
+  const currentCats = getCats(t);
+  const catPickerHtml = FLAT_CATS.map(val =>
+    `<label class="cat-pill"><input type="checkbox" value="${val}"${currentCats.includes(val) ? ' checked' : ''}> ${catLabels[val]}</label>`
+  ).join('');
+  const subCat = currentCats.find(c => SUBCATTED.has(c));
+  const subDefs = subCat ? subcatsFor(subCat) : null;
+  const curSub = t.subcategoria || (subDefs ? subDefs[0].v : '');
+  const subcatEditHtml = subDefs ? `
+    <div class="edit-field">
+      <div class="edit-label">Tipo</div>
+      <div class="cat-picker">
+        ${subDefs.map(s => `<label class="cat-pill"><input type="radio" name="esub-${t.id}" value="${s.v}"${curSub===s.v?' checked':''}> ${s.l}</label>`).join('')}
+      </div>
+    </div>` : '';
+  const curSubsubs = subCat ? subsubsFor(subCat, curSub) : null;
+  const subtypeEditHtml = `
+    <div class="edit-field" data-subtype-field style="display:${curSubsubs ? '' : 'none'}">
+      <div class="edit-label">Subtipo</div>
+      <select class="edit-input" data-f="subtype">${(curSubsubs||[]).map(v => `<option value="${v}"${t.subtype===v?' selected':''}>${v}</option>`).join('')}</select>
+    </div>`;
+  const edit = document.createElement('div');
+  edit.className = 'card-edit active';
+  edit.innerHTML = `
+    <div class="edit-modal-title">Editar card</div>
+    <div class="edit-field">
+      <div class="edit-label">Categorías</div>
+      <div class="cat-picker edit-cat-picker">${catPickerHtml}</div>
+    </div>
+    ${subcatEditHtml}
+    ${subtypeEditHtml}
+    <div class="edit-field">
+      <div class="edit-label">Título</div>
+      <input class="edit-input" data-f="titulo" value="${escAttr(t.titulo)}">
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Descripción</div>
+      <div data-rt-mount></div>
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Tags</div>
+      <input class="edit-input" data-f="tags" value="${escAttr((t.tags || []).join(', '))}">
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Link</div>
+      <input class="edit-input" data-f="link" value="${escAttr(t.link || '')}">
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Imagen</div>
+      <div class="img-picker-zone">
+        <input type="file" accept="image/*" class="edit-img-input">
+        <img class="img-picker-preview ${t.imagen ? 'visible' : ''}" src="${escAttr(t.imagen || '')}">
+        <div class="img-picker-label" style="${t.imagen ? 'display:none' : ''}">Haz clic para cambiar imagen</div>
+        <button class="img-remove ${t.imagen ? 'visible' : ''}">Quitar imagen</button>
+      </div>
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Carpeta</div>
+      <select class="edit-input" data-f="folder">${folderOptionsHtml(t.folderId)}</select>
+    </div>
+    <div class="edit-actions with-delete">
+      <button class="btn btn-danger btn-delete-edit">Eliminar</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-cancel-edit">Cancelar</button>
+        <button class="btn btn-outline btn-save-edit">Guardar</button>
+      </div>
+    </div>
+  `;
+
+  div.appendChild(view);
+
+  // Image picker (wired once; edit element is reused across opens)
+  setupImgPicker(
+    edit.querySelector('.edit-img-input'),
+    edit.querySelector('.img-picker-preview'),
+    edit.querySelector('.img-picker-label'),
+    edit.querySelector('.img-remove'),
+    b64 => { editImagen = b64; }
+  );
+
+  // Rich text editor (replaces the description textarea)
+  const rt = makeRichEditor(bodyToInitialHTML(t));
+  edit.querySelector('[data-rt-mount]').appendChild(rt.wrap);
+
+  // React to "Tipo" change → rebuild subtype options
+  if (subCat) {
+    edit.querySelectorAll(`input[name="esub-${t.id}"]`).forEach(r => r.addEventListener('change', () => {
+      const sel = edit.querySelector(`input[name="esub-${t.id}"]:checked`);
+      const ss = sel ? subsubsFor(subCat, sel.value) : null;
+      const field = edit.querySelector('[data-subtype-field]');
+      if (!field) return;
+      field.style.display = ss ? '' : 'none';
+      if (ss) {
+        const selEl = field.querySelector('[data-f="subtype"]');
+        const prev = selEl.value;
+        selEl.innerHTML = ss.map(v => `<option value="${v}"${(prev===v||t.subtype===v)?' selected':''}>${v}</option>`).join('');
+      }
+    }));
+  }
+
+  // Open detail modal on card click (ignore clicks on links)
+  div.addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    openCardModal(detail);
+  });
+
+  // Detail → edit mode
+  detail.querySelector('.btn-go-edit').addEventListener('click', () => swapCardModal(edit));
+
+  edit.querySelector('.btn-delete-edit').addEventListener('click', () => {
+    if (!confirm('¿Borrar esta card?')) return;
+    saveTricks(getTricks().filter(x => x.id !== t.id));
+    modalNeedsRender = true;
+    closeCardModal();
+  });
+
+  // Cancel edit → back to detail view
+  edit.querySelector('.btn-cancel-edit').addEventListener('click', () => {
+    swapCardModal(detail);
+  });
+
+  edit.querySelector('.btn-save-edit').addEventListener('click', () => {
+    const titulo = edit.querySelector('[data-f="titulo"]').value.trim();
+    const bodyHtml = rt.getHTML();
+    const cuerpo = rt.getText().trim();
+    if (!titulo || !cuerpo) { alert('Título y descripción son obligatorios.'); return; }
+    const categorias = Array.from(edit.querySelectorAll('.edit-cat-picker input:checked')).map(cb => cb.value);
+    const folderId = edit.querySelector('[data-f="folder"]').value || null;
+    if (categorias.length === 0 && !folderId) { alert('Selecciona al menos una categoría o una carpeta.'); return; }
+    const subcatEl = edit.querySelector(`input[name="esub-${t.id}"]:checked`);
+    const subcategoria = subcatEl ? subcatEl.value : (t.subcategoria || '');
+    const stField = edit.querySelector('[data-subtype-field]');
+    const stSel = edit.querySelector('[data-f="subtype"]');
+    const subtype = (stField && stField.style.display !== 'none' && stSel) ? stSel.value : '';
+    const tags = edit.querySelector('[data-f="tags"]').value.split(',').map(s => s.trim()).filter(Boolean);
+    const link = edit.querySelector('[data-f="link"]').value.trim();
+    const tricks = getTricks();
+    const idx = tricks.findIndex(x => x.id === t.id);
+    if (idx >= 0) {
+      tricks[idx] = { ...tricks[idx], titulo, cuerpo, bodyHtml, tags, link, imagen: editImagen, categorias, subcategoria, subtype, folderId };
+      saveTricks(tricks);
+    }
+    modalNeedsRender = true;
+    closeCardModal();
+  });
+
+  return div;
+}
+
+// ── Agents Doc ──
+function renderAgentsDoc() {
+  const area = document.getElementById('content-area');
+  area.className = 'cards-area';
+
+  const COMMANDS = [
+    {
+      cmd: '/dig',
+      title: 'Sample Digging',
+      desc: 'Agentes en paralelo, cada uno buscando samples desde su mundo. Antes de lanzar aplica una lente aleatoria (época · geografía · elemento) para meter variedad y sorpresa.',
+      asks: 'Nada obligatorio: eliges los agentes y lanzas.',
+      prompt: 'Un mood, género, instrumento o textura concreta ("algo de gospel de los 70", "solo pianos", "samples africanos rotos"). Lo que digas pesa por encima de la lente aleatoria.',
+      agents: 'Selección previa — todos disponibles',
+      tags: ['sample', 'markdown', 'lente aleatoria']
+    },
+    {
+      cmd: '/fdb',
+      title: 'Feedback WIP',
+      desc: 'Cada agente analiza tu track en progreso desde su perspectiva y sugiere técnicas e ideas concretas. No es crítica fría — es un productor amigo diciendo "yo probaría esto".',
+      asks: 'Un MP3 adjunto, o que describas el track en progreso.',
+      prompt: 'Un foco específico: "céntrate en el drop", "qué hago con los vocals", "me sobra algo en la mezcla".',
+      agents: 'Selección previa — todos disponibles',
+      tags: ['feedback', 'wip', 'markdown']
+    },
+    {
+      cmd: '/chord',
+      title: 'Chord Progressions',
+      desc: 'Progresiones de acordes desde el mundo armónico de cada artista. Dos MIDIs por agente: una base (1 acorde por compás desde el 1) y una con ritmo (un patrón fijo de 1-2 compases que se repite).',
+      asks: 'Tonalidad (concreta / audio de referencia / libre), feel, longitud (2 / 4 / 6-8 acordes) y si activar borrowed chords.',
+      prompt: '"borrowed" para intercambio modal · la tonalidad directa ("en F minor") · BPM · o un feel libre ("cada agente en su estilo").',
+      agents: 'Selección previa — todos disponibles',
+      tags: ['midi', 'armonía', 'daw']
+    },
+    {
+      cmd: '/melody',
+      title: 'Melodías',
+      desc: 'Frases melódicas monofónicas con el fraseo de cada artista. Regla 70/30: ~70% repite un motivo/hook y ~30% va libre (through-composed), con tirada independiente por agente.',
+      asks: 'Tonalidad, feel, longitud (1-2 / 4 / 8 barras), enfoque (melódica / rítmica / ambas) y si activar notas prestadas.',
+      prompt: '"borrowed"/"cromatismo" para salir de la escala · "todos repetidos" o "todos libres" para forzar el modo · tonalidad · BPM.',
+      agents: 'Selección previa — todos disponibles',
+      tags: ['midi', 'melodía', 'daw']
+    },
+    {
+      cmd: '/bass',
+      title: 'Patrones de Bajo',
+      desc: 'Líneas de bajo desde cada perspectiva, groove primero — el bajo es la casa: estable y repetitivo, centrado en la raíz. Regla 75/25: ~75% repite la frase, ~25% evoluciona.',
+      asks: 'Tonalidad, feel (deep / groove / minimal / melódico) y longitud (1 / 2 / 4 barras).',
+      prompt: '"todos repetidos" o "todos libres" · "con cromatismo" para un bajo más melódico (off por defecto) · tonalidad · BPM.',
+      agents: 'Selección previa — todos disponibles',
+      tags: ['midi', 'bajo', 'daw']
+    },
+    {
+      cmd: '/launch',
+      title: 'Estrategia de Lanzamiento',
+      desc: 'Sesión completa con el manager musical: plataformas, playlist pitching, prensa, redes sociales, sellos (si aplica) y nota de prensa.',
+      asks: 'Tu objetivo (audiencia / sellos / bookings / compartir) y la situación actual del artista. Opcional: audio o descripción del tema.',
+      prompt: 'El objetivo directo · fecha de salida · presupuesto · si es single o EP.',
+      agents: 'manager — agente exclusivo',
+      tags: ['estrategia', 'release', 'markdown']
+    },
+    {
+      cmd: '/discovery',
+      title: 'Novedades Curadas',
+      desc: 'El curator sale a la web y rastrea Reddit, YouTube, SoundCloud, radios y sellos anclado en tus faros (Jamie XX, Fred Again, Barry Can\'t Swim, Bonobo, Burial…). Te trae 5 temas del último mes con enlace verificado y la historia de por qué te los recomienda. No te recomienda a tus faros — busca emergentes que suenan a ellos.',
+      asks: 'El foco del día (UK electronic / melodic-emotional house / afro-deep house / atmosférico), o ninguno para rastrear todo tu universo.',
+      prompt: 'Un foco directo ("estilo Jamie XX", "afro house", "algo atmosférico tipo Burial"). Guarda el resultado en _discovery/YYYY-MM-DD/.',
+      agents: 'discovery — agente exclusivo (con acceso web)',
+      tags: ['descubrimiento', 'web', 'markdown']
+    }
+  ];
+
+  const AGENTS = [
+    { name: 'jamie-xx',        flavor: 'jazz-soul',    desc: 'Soul, gospel, música nigeriana, highlife, UK rave y vinilo oscuro. El sample emocional perfecto que nadie más encontraría.' },
+    { name: 'barry-cant-swim', flavor: 'jazz-soul',    desc: 'Jazz, funk y soul procesado hasta volverse completamente nuevo. El sample irreconocible que late debajo del house.' },
+    { name: 'majestic',        flavor: 'jazz-soul',    desc: 'Soul, jazz, gospel y MPB como material fuente. Evoca esa sensación de tarde de domingo — chill con alma.' },
+    { name: 'soulection',      flavor: 'jazz-soul',    desc: 'Soul alternativo, R&B de otro planeta, jazz de otra dimensión. El tipo de sample que suena en Soulection.' },
+    { name: 'monte-booker',    flavor: 'jazz-soul',    desc: 'Jazz aplicado al neo-soul, voicings complejos, R&B oscuro. Versátil: válido para samples, chords, melodías, bajo y feedback.', versatile: true },
+    { name: 'bonobo',          flavor: 'world',        desc: 'Jazz, world music, música brasileña, folk árabe, downtempo y texturas orgánicas. Alma y profundidad cinematográfica.' },
+    { name: 'christian-loffler',flavor:'world',        desc: 'Texturas naturales, folk nórdico, ambient melódico y lo que suena a paisaje — agua, viento, madera. El sample como naturaleza.' },
+    { name: 'parra-for-cuva',  flavor: 'world',        desc: 'Música árabe, flamenco, mediterráneo oriental. Música del mundo procesada con delicadeza — esencia cultural intacta.' },
+    { name: 'black-coffee',    flavor: 'afro',         desc: 'Afro house, música sudafricana, vocales africanas, percusión tribal, deep house con alma.' },
+    { name: 'keinemusik',      flavor: 'afro',         desc: 'Afro house, melodic techno, samples de África y Oriente que se convierten en herramientas de danza profunda.' },
+    { name: 'mura-masa',       flavor: 'afro',         desc: 'Pop global, afrobeats contemporáneos, dancehall, samples de géneros urbanos internacionales.' },
+    { name: 'fred-again',      flavor: 'contemporary', desc: 'Vocales emocionales, momentos humanos capturados, música pop contemporánea vuelta sample, notas de voz.' },
+    { name: 'burial',          flavor: 'contemporary', desc: 'Lo oscuro, lo roto, lo urbano de noche — R&B degradado, garage, 2-step, voces procesadas al límite.' },
+    { name: 'toro-y-moi',      flavor: 'contemporary', desc: 'City pop japonés, boogie 80s, chillwave, psych-funk y lo-fi soul. El sample que nadie tomaría en serio pero que lo es todo.' },
+    { name: 'paul-kalkbrenner',flavor: 'electronic',   desc: 'Techno melódico berlinés, sintetizadores analógicos, Kraftwerk y electrónica europea como fuente inesperada.' },
+    { name: 'ross-from-friends',flavor:'electronic',   desc: 'Lo-fi house, samples degradados, grabaciones en cassette, dance music rota y rave emocional de los 90s.' },
+    { name: 'manager',         flavor: 'manager',      desc: 'Estrategia de lanzamiento para artistas de electrónica independiente. Plataformas, prensa, playlists, sellos y booking.', exclusive: '/launch' },
+    { name: 'discovery',       flavor: 'curator',      desc: 'Curator con acceso web. Rastrea Reddit, YouTube, SoundCloud, radios y sellos anclado en tus faros y te trae música NUEVA del último mes que suena a tu mundo — con enlaces verificados y la historia detrás.', exclusive: '/discovery' }
+  ];
+
+  const flavorDot = {
+    'jazz-soul':    '#c9a84c',
+    'world':        '#4ca87a',
+    'afro':         '#c96a3a',
+    'contemporary': '#7a7ac9',
+    'electronic':   '#4a8ac9',
+    'manager':      '#9a4ac9',
+    'curator':      '#2a9d8f'
+  };
+
+  const cmdsHtml = COMMANDS.map(c => `
+    <div class="adoc-cmd-card">
+      <div class="adoc-cmd-header">
+        <span class="adoc-cmd-badge">${c.cmd}</span>
+        <span class="adoc-cmd-title">${c.title}</span>
+      </div>
+      <div class="adoc-cmd-desc">${c.desc}</div>
+      <div class="adoc-cmd-meta">
+        <div class="adoc-meta-block"><span class="adoc-meta-label">Pide</span><span class="adoc-meta-text">${c.asks}</span></div>
+        <div class="adoc-meta-block"><span class="adoc-meta-label">Ajustes que pedir en el prompt</span><span class="adoc-meta-text">${c.prompt}</span></div>
+      </div>
+    </div>
+  `).join('');
+
+  const agentsHtml = AGENTS.map(a => `
+    <div class="adoc-agent-card">
+      <div class="adoc-agent-header">
+        <span class="adoc-agent-dot" style="background:${flavorDot[a.flavor]}"></span>
+        <span class="adoc-agent-name">${a.name}</span>
+        ${a.versatile ? '<span class="adoc-badge adoc-badge-versatil">versátil</span>' : ''}
+        ${a.exclusive ? `<span class="adoc-badge adoc-badge-excl">solo ${a.exclusive}</span>` : ''}
+      </div>
+      <div class="adoc-agent-desc">${a.desc}</div>
+    </div>
+  `).join('');
+
+  area.innerHTML = `
+    <div class="agents-doc">
+      <div class="adoc-tabs">
+        <button class="adoc-tab ${agentsDocTab === 'comandos' ? 'active' : ''}" data-atab="comandos">Comandos</button>
+        <button class="adoc-tab ${agentsDocTab === 'agentes' ? 'active' : ''}" data-atab="agentes">Agentes</button>
+      </div>
+      ${agentsDocTab === 'comandos' ? `
+        <div class="adoc-intro">
+          Los comandos MIDI (<code>/chord</code>, <code>/melody</code>, <code>/bass</code>) generan archivos <code>.mid</code> por agente listos para arrastrar al DAW. Cada card indica qué <strong>pide</strong> el comando y los <strong>ajustes</strong> que puedes escribir en el prompt para saltarte preguntas o forzar algo (toggles como <code>borrowed</code>, modos como <code>todos repetidos</code>). BPM por defecto <code>126</code>.
+        </div>
+        <div class="adoc-cmd-grid">${cmdsHtml}</div>
+      ` : `
+        <div class="adoc-intro">
+          16 agentes de producción + 2 agentes exclusivos (manager para /launch y discovery para /discovery). Los de producción son intercambiables entre /dig, /fdb, /chord, /melody y /bass — puedes elegir cuáles lanzar cada vez.
+        </div>
+        <div class="adoc-agent-grid">${agentsHtml}</div>
+      `}
+    </div>
+  `;
+
+  area.querySelectorAll('.adoc-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      agentsDocTab = btn.dataset.atab;
+      renderAgentsDoc();
+    });
+  });
+}
+
+// ── Discovery (link directory: doc-style page) ──
+const DISCOVERY = [
+  { id: 'reddits',    label: 'Reddits',             dot: '#ff4500', links: [
+    { name: 'r/futurebeats',   url: 'https://www.reddit.com/r/futurebeats/',   desc: 'Future beats, wonky, beat scene — el corazón del sonido Soulection/Brainfeeder.' },
+    { name: 'r/futuregarage',  url: 'https://www.reddit.com/r/futuregarage/',  desc: 'Future garage, 2-step y UK bass atmosférico — territorio Burial.' },
+    { name: 'r/triphop',       url: 'https://www.reddit.com/r/triphop/',       desc: 'Trip-hop, downtempo y todo lo lento y oscuro con alma.' },
+    { name: 'r/listentothis',  url: 'https://www.reddit.com/r/listentothis/',  desc: 'Descubrimiento general — música nueva e infravalorada de todos los géneros.' },
+    { name: 'r/electronicmusic',     url: 'https://www.reddit.com/r/electronicmusic/',     desc: 'Comunidad grande y general de electrónica — novedades, debate y descubrimiento.' },
+    { name: 'r/melodichousetechno',  url: 'https://www.reddit.com/r/melodichousetechno/',  desc: 'Melodic house & techno — Anjunadeep, Keinemusik y el house emocional de club.' },
+    { name: 'r/deephouse',           url: 'https://www.reddit.com/r/deephouse/',           desc: 'Deep house — los grooves cálidos y profundos con alma.' },
+    { name: 'r/idm',                 url: 'https://www.reddit.com/r/idm/',                 desc: 'Intelligent dance music — electrónica experimental, Aphex Twin y texturas raras.' }
+  ] },
+  { id: 'youtube',    label: 'YouTube Channels',    dot: '#ff0000', links: [
+    { name: 'MrSuicideSheep',  url: 'https://www.youtube.com/@MrSuicideSheep', desc: 'Canal histórico de electrónica melódica y emocional — chillstep, future bass, descubrimiento.' },
+    { name: 'Selected',        url: 'https://www.youtube.com/@selected',       desc: 'Deep & melodic house curado — el sonido de club emocional y veraniego.' },
+    { name: 'TRNDMSK',         url: 'https://www.youtube.com/@TRNDMSK',        desc: 'Melodic house & techno, organic house — sello y canal alemán con muy buen gusto.' },
+    { name: 'Chillhop Music',  url: 'https://www.youtube.com/@ChillhopMusic',  desc: 'Lo-fi hip-hop, jazzhop y beats relajados — el hogar del chillhop.' },
+    { name: 'Stay True Sounds',url: 'https://www.youtube.com/@StayTrueSounds', desc: 'Sello de Black Coffee — afro house y deep house sudafricano con alma.' },
+    { name: 'Majestic Casual', url: 'https://www.youtube.com/@majesticcasual', desc: 'Indie-electrónica, alt-R&B y chill con alma — esa sensación de tarde de domingo.' },
+    { name: 'Cercle',          url: 'https://www.youtube.com/@Cercle',         desc: 'Sets en localizaciones espectaculares — melodic/organic house y techno con vista.' },
+    { name: 'Boiler Room',     url: 'https://www.youtube.com/@boilerroom',     desc: 'La institución del club underground — sets en directo de todo el espectro electrónico.' },
+    { name: 'Ninja Tune',      url: 'https://www.youtube.com/@NinjaTune',      desc: 'Sello legendario — Bonobo, Bicep y el downtempo/electrónica con alma.' },
+    { name: 'Anjunadeep',      url: 'https://www.youtube.com/@anjunadeep',     desc: 'Deep & melodic house emotivo — el sello de referencia del género.' }
+  ] },
+  { id: 'soundcloud', label: 'SoundCloud Channels', dot: '#ff5500', links: [
+    { name: 'Soulection',       url: 'https://soundcloud.com/soulection',             desc: 'El colectivo/sello que define el sonido del futuro — alt-R&B, future beats, soul electrónico.' },
+    { name: 'Touching Bass',    url: 'https://soundcloud.com/touchingbass',           desc: 'Colectivo y sello londinense — soul, jazz y beats con mucho gusto y comunidad.' },
+    { name: 'HW&W Recordings',  url: 'https://soundcloud.com/huhwhatandwhere',        desc: 'Sello (Huh What & Where) — future beats global, electronic soul.' },
+    { name: 'Fault Radio',      url: 'https://soundcloud.com/faultradio',             desc: 'Radio/colectivo de Oakland — sets en directo de house, techno y electrónica.' },
+    { name: 'Eton Messy',       url: 'https://soundcloud.com/etonmessyrecords',       desc: 'Sello y curaduría UK — house, garage y groove melódico accesible.' },
+    { name: 'La Belle Musique', url: 'https://soundcloud.com/labellemusiqueofficial', desc: 'Curaduría francesa — deep/melodic house e indie-electrónica con gusto.' },
+    { name: 'Cosmic Compositions', url: 'https://soundcloud.com/cosmiccompositions',  desc: 'Beat scene, jazz cósmico y soul futurista — territorio Brainfeeder/LA.' },
+    { name: 'Hyperdub',         url: 'https://soundcloud.com/hyperdub',               desc: 'Sello de Kode9 — dubstep, UK bass, footwork y lo más adelantado del underground.' },
+    { name: 'Hessle Audio',     url: 'https://soundcloud.com/hessleaudio',            desc: 'Sello de Ben UFO, Pearson Sound & Pangaea — UK bass y techno de vanguardia.' },
+    { name: 'Ninja Tune',       url: 'https://soundcloud.com/ninja-tune',             desc: 'Sello legendario — Bonobo, Bicep y el downtempo/electrónica con alma.' }
+  ] },
+  { id: 'radios',     label: 'Radios',              dot: '#4ca87a', links: [
+    { name: 'NTS Radio',      url: 'https://www.nts.live/',                    desc: 'Radio online global desde Londres — la referencia del underground, todo género imaginable.' },
+    { name: 'The Lot Radio',  url: 'https://www.youtube.com/@TheLotRadio/videos', desc: 'Radio independiente desde un contenedor en Brooklyn — DJs y selectores de todo el mundo.' },
+    { name: 'KEXP',           url: 'https://www.youtube.com/@kexp/videos',     desc: 'Radio pública de Seattle — sesiones en vivo legendarias y descubrimiento sin igual.' },
+    { name: 'dublab',         url: 'https://www.dublab.com/',                  desc: 'Radio sin ánimo de lucro de LA — cultura sonora, ambient, beats y experimentación desde 1999.' },
+    { name: 'Stones Throw',   url: 'https://www.youtube.com/@stonesthrow/videos',    desc: 'Sello de LA (Madlib, J Dilla, Knxwledge) — hip-hop, soul y beats de culto.' },
+    { name: 'Future Classic', url: 'https://www.youtube.com/@futureclassic/videos',  desc: 'Sello australiano (Flume, Chet Faker) — electrónica pop y future con alma.' },
+    { name: 'Tru Thoughts',   url: 'https://www.youtube.com/@Tru_Thoughts/videos',   desc: 'Sello de Brighton — soul, funk, jazz y electrónica orgánica.' },
+    { name: 'Rinse FM',       url: 'https://www.rinse.fm/',                    desc: 'Radio londinense legendaria — grime, garage, UK bass y club underground.' }
+  ] }
+];
+
+function renderDiscovery() {
+  const area = document.getElementById('content-area');
+  area.className = 'cards-area';
+
+  if (!DISCOVERY.some(s => s.id === discoveryTab)) discoveryTab = DISCOVERY[0].id;
+  const section = DISCOVERY.find(s => s.id === discoveryTab);
+
+  const hostFor = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
+
+  const linksHtml = section.links.length ? section.links.map(l => `
+    <a class="disc-link" href="${l.url}" target="_blank" rel="noopener">
+      <div class="disc-link-main">
+        <span class="disc-link-name">${l.name}</span>
+        ${l.desc ? `<span class="disc-link-desc">${l.desc}</span>` : ''}
+      </div>
+      <span class="disc-link-host">${hostFor(l.url)}</span>
+    </a>
+  `).join('') : `<div class="disc-empty">Aún no hay links en ${section.label}. Pásamelos y los añado.</div>`;
+
+  area.innerHTML = `
+    <div class="agents-doc">
+      <div class="adoc-tabs">
+        ${DISCOVERY.map(s => `
+          <button class="adoc-tab ${s.id === discoveryTab ? 'active' : ''}" data-dtab="${s.id}">
+            <span class="disc-tab-dot" style="background:${s.dot}"></span>${s.label}
+          </button>
+        `).join('')}
+      </div>
+      <div class="adoc-intro">
+        Directorio de fuentes para descubrir música — sitios donde cazar samples, referencias e inspiración. Click en cualquier link para abrirlo en una pestaña nueva.
+      </div>
+      <div class="disc-list">${linksHtml}</div>
+    </div>
+  `;
+
+  area.querySelectorAll('.adoc-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      discoveryTab = btn.dataset.dtab;
+      renderDiscovery();
+    });
+  });
+}
+
+// ── Modal ──
+let newImagen = '';
+let newRt = null;  // rich editor instance for the create modal
+
+function openModal(tipo = 'texto') {
+  newTipo = tipo;
+  const isGrid = tipo === 'grid';
+
+  document.getElementById('modal-title-text').textContent = isGrid ? 'Nuevo grid' : 'Nueva card';
+
+  // auto-suggest grid type based on category
+  const gtypeMap = { drums:'drums', bass:'melody', melodia:'melody', pads:'chords' };
+  const sugGtype = gtypeMap[currentCat] || 'drums';
+  const gRadio = document.querySelector(`input[name="new-gtype"][value="${sugGtype}"]`);
+  if (gRadio) gRadio.checked = true;
+
+  // show / hide sections
+  document.getElementById('new-grid-opts').style.display = isGrid ? 'flex' : 'none';
+  ['new-field-cuerpo','new-field-link','new-field-imagen'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = isGrid ? 'none' : '';
+  });
+  if (isGrid && !newGridData) initNewGrid();
+
+  document.querySelectorAll('#new-cat-picker input').forEach(cb => {
+    cb.checked = cb.value === currentCat;
+  });
+  const showSubcat = SUBCATTED.has(currentCat) && !isGrid;
+  document.getElementById('new-subcat-field').style.display = showSubcat ? '' : 'none';
+  // build subcat radios for this category
+  const subDefs = subcatsFor(currentCat);
+  const preSel = showSubcat && subDefs.some(s => s.v === currentSubcat) ? currentSubcat : subDefs[0].v;
+  document.getElementById('new-subcat-picker').innerHTML = subDefs.map(s =>
+    `<label class="cat-pill"><input type="radio" name="new-subcat" value="${s.v}"${s.v === preSel ? ' checked' : ''}> ${s.l}</label>`
+  ).join('');
+  // third-level subtype: depends on the chosen subcat; rebuild on change
+  const refreshSubtype = () => {
+    const sel = document.querySelector('input[name="new-subcat"]:checked');
+    const ss = (showSubcat && sel) ? subsubsFor(currentCat, sel.value) : null;
+    const field = document.getElementById('new-subtype-field');
+    field.style.display = ss ? '' : 'none';
+    if (ss) {
+      const pre = (currentSubsub !== 'all' && ss.includes(currentSubsub)) ? currentSubsub : ss[0];
+      document.getElementById('new-subtype-picker').innerHTML = ss.map(v => `<option value="${v}"${v===pre?' selected':''}>${v}</option>`).join('');
+    }
+  };
+  document.querySelectorAll('#new-subcat-picker input').forEach(r => r.addEventListener('change', refreshSubtype));
+  refreshSubtype();
+  // Mount the Notion-like rich editor (negrita, cursiva, listas, imágenes, menú "/")
+  const rtMount = document.querySelector('[data-rt-mount-new]');
+  if (rtMount) {
+    rtMount.innerHTML = '';
+    newRt = makeRichEditor('');
+    rtMount.appendChild(newRt.wrap);
+  }
+  document.getElementById('modal').classList.add('active');
+  setTimeout(() => document.getElementById('new-titulo').focus(), 50);
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  ['new-titulo', 'new-tags', 'new-link'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  // Tear down the rich editor
+  const rtMountClose = document.querySelector('[data-rt-mount-new]');
+  if (rtMountClose) rtMountClose.innerHTML = '';
+  newRt = null;
+  document.querySelectorAll('#new-cat-picker input').forEach(cb => { cb.checked = false; });
+  document.getElementById('new-subcat-picker').innerHTML = '';
+  document.getElementById('new-subtype-picker').innerHTML = '';
+  document.getElementById('new-subtype-field').style.display = 'none';
+  // Reset image picker
+  newImagen = '';
+  const prev = document.getElementById('new-img-preview');
+  const lbl = document.getElementById('new-img-label');
+  const rem = document.getElementById('new-img-remove');
+  prev.src = ''; prev.classList.remove('visible');
+  lbl.style.display = ''; rem.classList.remove('visible');
+  // reset grid
+  newGridData = null;
+  const painter = document.getElementById('new-grid-painter');
+  if (painter) painter.innerHTML = '';
+  document.getElementById('new-grid-opts').style.display = 'none';
+  ['new-field-cuerpo','new-field-link','new-field-imagen'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = '';
+  });
+  newTipo = 'texto';
+  newFolderId = null;
+  document.getElementById('modal-title-text').textContent = 'Nueva card';
+}
+
+// ── Card detail / edit modal ──
+let modalNeedsRender = false;
+function openCardModal(contentEl) {
+  modalNeedsRender = false;
+  const box = document.getElementById('card-modal-box');
+  box.innerHTML = '';
+  box.appendChild(contentEl);
+  document.getElementById('card-modal').classList.add('active');
+}
+function swapCardModal(contentEl) {
+  const box = document.getElementById('card-modal-box');
+  box.innerHTML = '';
+  box.appendChild(contentEl);
+}
+function closeCardModal() {
+  document.getElementById('card-modal').classList.remove('active');
+  document.getElementById('card-modal-box').innerHTML = '';
+  if (modalNeedsRender) { modalNeedsRender = false; render(); }
+}
+document.getElementById('card-modal').addEventListener('click', e => {
+  if (e.target.id === 'card-modal') closeCardModal();
+});
+
+function saveNew() {
+  const tipo = newTipo || 'texto';
+  const titulo = document.getElementById('new-titulo').value.trim();
+  if (!titulo) { alert('Título es obligatorio.'); return; }
+  const categorias = Array.from(document.querySelectorAll('#new-cat-picker input:checked')).map(cb => cb.value);
+  if (categorias.length === 0 && !newFolderId) { alert('Selecciona al menos una categoría.'); return; }
+  const tags = document.getElementById('new-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+  const subcatRadio = document.querySelector('input[name="new-subcat"]:checked');
+  const subcategoria = tipo === 'grid' ? 'examples' : (subcatRadio ? subcatRadio.value : '');
+  const subtypeField = document.getElementById('new-subtype-field');
+  const subtype = (subtypeField.style.display !== 'none') ? document.getElementById('new-subtype-picker').value : '';
+  const id = `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+  let trick;
+  if (tipo === 'grid') {
+    if (!newGridData) { alert('Configura el grid primero.'); return; }
+    trick = {
+      id, tipo: 'grid',
+      gridType: newGridData.gridType,
+      resolution: newGridData.resolution,
+      numNotes: newGridData.numNotes,
+      tracks: newGridData.tracks.map(t => ({ pattern: [...t.pattern] })),
+      categorias, subcategoria, titulo, tags, cuerpo: '', link: '', imagen: ''
+    };
+  } else {
+    const bodyHtml = newRt ? newRt.getHTML() : '';
+    const cuerpo = newRt ? newRt.getText().trim() : '';
+    if (!cuerpo) { alert('Descripción es obligatoria.'); return; }
+    trick = {
+      id, categorias, subcategoria,
+      titulo, cuerpo, bodyHtml, tags,
+      link: document.getElementById('new-link').value.trim(),
+      imagen: newImagen
+    };
+  }
+  if (newFolderId) trick.folderId = newFolderId;
+  if (subtype) trick.subtype = subtype;
+
+  const all = getTricks();
+  all.push(trick);
+  if (!saveTricks(all)) return;   // guardado falló (p.ej. cuota llena): no cerrar, no perder lo escrito
+  closeModal();
+  render();
+}
+
+// Setup image picker in modal (runs once)
+setupImgPicker(
+  document.getElementById('new-img-input'),
+  document.getElementById('new-img-preview'),
+  document.getElementById('new-img-label'),
+  document.getElementById('new-img-remove'),
+  b64 => { newImagen = b64; }
+);
+
+// ── Import ──
+function importJSON(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) { alert('El JSON debe ser un array.'); return; }
+      const existing = getTricks();
+      const ids = new Set(existing.map(t => t.id));
+      let added = 0;
+      data.forEach(item => {
+        if (item.id && item.titulo && item.cuerpo && item.categoria && !ids.has(item.id)) {
+          existing.push(item);
+          ids.add(item.id);
+          added++;
+        }
+      });
+      saveTricks(existing);
+      render();
+      alert(`${added} card${added !== 1 ? 's' : ''} importada${added !== 1 ? 's' : ''}.`);
+    } catch(err) {
+      alert('Error al leer el JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── Sidebar navigation ──
+function setToolbarForCat(cat) {
+  const isDoc = cat === 'agents-doc' || cat === 'discovery';
+  const noNew = REFCATS.has(cat) || cat === 'plugins';  // these create via in-content buttons
+  document.getElementById('search').style.display    = isDoc ? 'none' : '';
+  document.getElementById('btn-new').style.display   = (isDoc || noNew) ? 'none' : '';
+  document.getElementById('btn-new-grid').style.display = (isDoc || noNew) ? 'none' : '';
+  document.getElementById('btn-import').style.display = (isDoc || noNew) ? 'none' : '';
+}
+
+document.querySelectorAll('.sidebar-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    currentCat = item.dataset.cat;
+    currentSubcat = defaultSubcat(currentCat);
+    currentFolder = null;
+    document.getElementById('toolbar-title').textContent = catLabels[currentCat] || currentCat;
+    searchQuery = '';
+    document.getElementById('search').value = '';
+    setToolbarForCat(currentCat);
+    render();
+  });
+});
+
+document.getElementById('btn-new').addEventListener('click', () => { newFolderId = null; openModal('texto'); });
+document.getElementById('btn-new-grid').addEventListener('click', () => { newFolderId = null; openModal('grid'); });
+document.getElementById('btn-cancel').addEventListener('click', closeModal);
+document.getElementById('btn-save-new').addEventListener('click', saveNew);
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target.id === 'modal') closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeCardModal(); }
+  if (e.key === 'Enter' && e.metaKey && document.getElementById('modal').classList.contains('active')) saveNew();
+});
+
+document.getElementById('btn-import').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) { importJSON(e.target.files[0]); e.target.value = ''; }
+});
+
+document.getElementById('search').addEventListener('input', e => {
+  searchQuery = e.target.value.trim();
+  render();
+});
+
+// ── Full backup: export / import (cards + folders, images included) ──
+function exportBackup() {
+  const data = {
+    type: 'hub-backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    tricks: getTricks(),
+    folders: getFolders()
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `hub-backup-${d}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    let data;
+    try { data = JSON.parse(e.target.result); }
+    catch (err) { alert('Archivo no válido: ' + err.message); return; }
+    if (!data || data.type !== 'hub-backup' || !Array.isArray(data.tricks) || !Array.isArray(data.folders)) {
+      alert('Esto no parece un backup del Hub.'); return;
+    }
+    const curT = getTricks().length, curF = getFolders().length;
+    const msg = (curT || curF)
+      ? `Esto REEMPLAZARÁ tus datos actuales (${curT} cards, ${curF} carpetas) por el backup (${data.tricks.length} cards, ${data.folders.length} carpetas).\n\n¿Continuar?`
+      : `Importar ${data.tricks.length} cards y ${data.folders.length} carpetas?`;
+    if (!confirm(msg)) return;
+    saveTricks(data.tricks);
+    saveFolders(data.folders);
+    currentFolder = null;
+    render();
+    alert('Backup importado correctamente.');
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('btn-export-backup').addEventListener('click', exportBackup);
+document.getElementById('btn-import-backup').addEventListener('click', () => {
+  document.getElementById('backup-input').click();
+});
+document.getElementById('backup-input').addEventListener('change', e => {
+  if (e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ''; }
+});
+
+// ── MIDI Utilities ──
+
+function varLen(n) {
+  const b = [n & 0x7F]; n >>= 7;
+  while (n > 0) { b.unshift((n & 0x7F) | 0x80); n >>= 7; }
+  return b;
+}
+
+function parseMIDIBuffer(buffer) {
+  const u8 = new Uint8Array(buffer);
+  let p = 0;
+  const r8  = () => u8[p++];
+  const r16 = () => { const v = (u8[p]<<8)|u8[p+1]; p+=2; return v; };
+  const r32 = () => { const v = (u8[p]<<24)|(u8[p+1]<<16)|(u8[p+2]<<8)|u8[p+3]; p+=4; return v; };
+  const rVL = () => { let v=0,b; do { b=r8(); v=(v<<7)|(b&0x7F); } while(b&0x80); return v; };
+
+  if (r32() !== 0x4D546864) return null;
+  r32(); // header len
+  r16(); // format
+  const numTracks = r16();
+  const ppq = r16();
+
+  const noteOns = [];
+  for (let t = 0; t < numTracks; t++) {
+    if (p + 8 > u8.length) break;
+    if (r32() !== 0x4D54726B) break;
+    const trackEnd = p + r32();
+    let tick = 0, lastStatus = 0;
+    while (p < trackEnd && p < u8.length) {
+      tick += rVL();
+      let status = u8[p];
+      if (status & 0x80) { lastStatus = status; p++; } else status = lastStatus;
+      const type = status >> 4, ch = status & 0x0F;
+      if      (type === 0x9) { const n=r8(),v=r8(); if(v>0) noteOns.push({tick,note:n,ch}); }
+      else if (type === 0x8) { r8(); r8(); }
+      else if (type === 0xA || type === 0xB || type === 0xE) { r8(); r8(); }
+      else if (type === 0xC || type === 0xD) { r8(); }
+      else if (status === 0xFF) { r8(); p += rVL(); }
+      else if (status === 0xF0 || status === 0xF7) { p += rVL(); }
+      else { p = trackEnd; break; }
+    }
+    p = trackEnd;
+  }
+  return { ppq, noteOns };
+}
+
+function midiToGrid(noteOns, ppq, resolution, gridType, numNotes, numSteps) {
+  const stepT = { '1 Bar':ppq*4,'1/4':ppq,'1/8':ppq/2,'1/16':ppq/4,'1/32':ppq/8 }[resolution] || ppq/4;
+
+  if (gridType === 'drums') {
+    const pats = Array.from({length:5}, () => new Array(numSteps).fill(0));
+    const dm = {};
+    [35,36].forEach(n=>dm[n]=0); [37,38,39,40].forEach(n=>dm[n]=1);
+    [42,44].forEach(n=>dm[n]=2); [46].forEach(n=>dm[n]=3);
+    noteOns.forEach(({tick,note}) => {
+      const s = Math.round(tick/stepT) % numSteps;
+      pats[dm[note]!==undefined ? dm[note] : 4][s] = 1;
+    });
+    return pats;
+  }
+  if (gridType === 'melody') {
+    const pat = new Array(numSteps).fill(0);
+    noteOns.forEach(({tick}) => { pat[Math.round(tick/stepT) % numSteps] = 1; });
+    return [pat];
+  }
+  // chords: take N unique pitches (highest), top-to-bottom = highest-to-lowest
+  const pitches = [...new Set(noteOns.map(n=>n.note))].sort((a,b)=>a-b).slice(-numNotes).reverse();
+  const pats = pitches.map(() => new Array(numSteps).fill(0));
+  noteOns.forEach(({tick,note}) => {
+    const idx = pitches.indexOf(note);
+    if (idx >= 0) pats[idx][Math.round(tick/stepT) % numSteps] = 1;
+  });
+  return pats;
+}
+
+function generateMIDI(patterns, gridType, resolution) {
+  const PPQ = 480;
+  const stepT  = { '1 Bar':PPQ*4,'1/4':PPQ,'1/8':PPQ/2,'1/16':PPQ/4,'1/32':PPQ/8 }[resolution] || PPQ/4;
+  const noteDur = Math.max(1, stepT - 10);
+  const drumNotes   = [36,38,42,46,47];
+  const chordNotes5 = [74,70,67,64,60]; // 9th→Root over C
+
+  const evs = [];
+  evs.push({ t:0, d:[0xFF,0x51,0x03,0x07,0xA1,0x20] }); // 120 BPM
+
+  patterns.forEach((pat, ti) => {
+    pat.forEach((on, step) => {
+      if (!on) return;
+      const tick = step * stepT;
+      let note, ch;
+      if (gridType === 'drums') { note = drumNotes[ti]||47; ch = 9; }
+      else if (gridType === 'chords') { note = chordNotes5[5 - patterns.length + ti]; ch = 0; }
+      else { note = 60; ch = 0; }
+      evs.push({ t: tick,          d:[0x90|ch, note, 100] });
+      evs.push({ t: tick + noteDur, d:[0x80|ch, note, 0]  });
+    });
+  });
+
+  evs.sort((a,b) => a.t - b.t);
+  let cur = 0;
+  const tb = [];
+  evs.forEach(e => { tb.push(...varLen(e.t-cur), ...e.d); cur = e.t; });
+  tb.push(0x00, 0xFF, 0x2F, 0x00);
+
+  const tl = tb.length;
+  return new Uint8Array([
+    0x4D,0x54,0x68,0x64, 0,0,0,6, 0,0, 0,1, (PPQ>>8)&0xFF, PPQ&0xFF,
+    0x4D,0x54,0x72,0x6B, (tl>>24)&0xFF,(tl>>16)&0xFF,(tl>>8)&0xFF,tl&0xFF,
+    ...tb
+  ]);
+}
+
+function downloadMIDI(bytes, filename) {
+  const url = URL.createObjectURL(new Blob([bytes], {type:'audio/midi'}));
+  const a = Object.assign(document.createElement('a'), {href:url, download:filename});
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function pickMIDIFile(cb) {
+  const inp = Object.assign(document.createElement('input'), {type:'file', accept:'.mid,.midi'});
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = re => cb(re.target.result);
+    r.readAsArrayBuffer(f);
+  };
+  inp.click();
+}
+
+// ── Grid modal state ──
+let newGridData = null;
+
+function initNewGrid() {
+  const gtype  = document.querySelector('input[name="new-gtype"]:checked')?.value  || 'drums';
+  const res    = document.querySelector('input[name="new-gres"]:checked')?.value   || '1/16';
+  const voices = parseInt(document.querySelector('input[name="new-gvoices"]:checked')?.value || '3');
+
+  document.getElementById('new-grid-voices-field').style.display = gtype === 'chords' ? '' : 'none';
+
+  const spb   = RES_SPB[res] || 16;
+  const steps = BARS * spb;
+  let trackDefs;
+  if (gtype === 'drums') trackDefs = GRID_TRACK_DEFS.drums;
+  else if (gtype === 'chords') trackDefs = GRID_TRACK_DEFS.chords.slice(5 - voices);
+  else trackDefs = GRID_TRACK_DEFS.melody;
+
+  const prev = newGridData;
+  newGridData = {
+    gridType: gtype, resolution: res, numNotes: voices,
+    tracks: trackDefs.map((_, ti) => {
+      const keep = prev && prev.gridType === gtype && (RES_SPB[prev.resolution]||16) === spb && prev.tracks[ti];
+      return { pattern: keep ? [...prev.tracks[ti].pattern] : new Array(steps).fill(0) };
+    })
+  };
+
+  const painter = document.getElementById('new-grid-painter');
+  painter.innerHTML = '';
+  const patterns = newGridData.tracks.map(t => t.pattern);
+  painter.appendChild(makePaintableGrid(trackDefs, patterns, steps, spb, null));
+}
+
+
+document.querySelectorAll('input[name="new-gtype"], input[name="new-gres"], input[name="new-gvoices"]').forEach(r => {
+  r.addEventListener('change', () => { if (newGridData !== null) initNewGrid(); });
+});
+
+document.getElementById('btn-midi-import-modal').addEventListener('click', () => {
+  if (!newGridData) initNewGrid();
+  pickMIDIFile(buffer => {
+    const parsed = parseMIDIBuffer(buffer);
+    if (!parsed) { alert('No se pudo leer el archivo MIDI.'); return; }
+    const { gridType, resolution, numNotes } = newGridData;
+    const spb2     = RES_SPB[resolution] || 16;
+    const numSteps = BARS * spb2;
+    const newPats  = midiToGrid(parsed.noteOns, parsed.ppq, resolution, gridType, numNotes||3, numSteps);
+    newPats.forEach((p, ti) => { if (newGridData.tracks[ti]) newGridData.tracks[ti].pattern = [...p]; });
+    const painter = document.getElementById('new-grid-painter');
+    painter.innerHTML = '';
+    const trackDefs = gridType==='drums' ? GRID_TRACK_DEFS.drums
+                    : gridType==='chords' ? GRID_TRACK_DEFS.chords.slice(5-(numNotes||3))
+                    : GRID_TRACK_DEFS.melody;
+    const pats = newGridData.tracks.map(t => t.pattern);
+    painter.appendChild(makePaintableGrid(trackDefs, pats, numSteps, spb2, null));
+  });
+});
+
+// ── Clear any previously loaded base cards (ids starting with 'base_')
+function cleanBaseCards() {
+  const all = getTricks();
+  const clean = all.filter(t => !t.id.startsWith('base_'));
+  if (clean.length !== all.length) saveTricks(clean);
+}
+
+// ── Seed Generadores plugin folders (one-time) ──
+function seedPlugins() {
+  if (lsGet('hub_seed_plugins_v1')) return;
+  const SEED = {
+    Synth:   ['Analog','ANA 2','Analog Lab V','Diva','Massive X','Serum','Spire','Wavetable','Droplets'],
+    Piano:   ['Addictive Keys','Imagiro Piano','LABS','Lofi Keys','MNDALA 2'],
+    Strings: ['Augmented YANGTZE'],
+    Guitar:  ['ESW Vinyl Guitar'],
+    Sampler: ['Sampler','Simpler','Web Sampler','QUANTA'],
+    Drums:   ['SSDSampler5']
+  };
+  const folders = getFolders();
+  let n = 0;
+  Object.entries(SEED).forEach(([sub, names]) => {
+    const scope = `plugins/generadores/${sub}`;
+    names.forEach(name => {
+      folders.push({
+        id: `fol_seed_${Date.now()}_${(n++)}_${Math.random().toString(36).slice(2,5)}`,
+        type: 'plugin', name, parentId: null, imagen: '', scope
+      });
+    });
+  });
+  saveFolders(folders);
+  lsSet('hub_seed_plugins_v1', '1');
+}
+
+// ── Seed Efectos + Multiefectos plugin folders (one-time) ──
+function seedEfectos() {
+  if (lsGet('hub_seed_efectos_v1')) return;
+  const EF = {
+    Audio:       ['Compressor','Glue compressor','EQ Eight','Utility','OTT','Pro L','Pro Q2','Wider'],
+    Delay:       ['Delay','Echo','Filter delay','Valhalla Delay'],
+    Reverb:      ['Reverb','Foyer','Hybrid Reverb','Valhalla VintageVerb'],
+    Distorsion:  ['Overdrive','Saturator','BDE','NudiStort','Szechuan Saturator'],
+    Drums:       ['CLA Drums','DS-10 Drum Shaper'],
+    Motion:      ['Autofilter','Auto-Pan','LFO'],
+    Steps:       ['A1TRriggerGate','DS Tantra 2','Filter SEM','KHS Trance Gate'],
+    Sidechain:   ['Compressor','Gate','KickStarter 2','LFO Tool'],
+    Texturas:    ['Texturize','SoundPlaceIt','RC-20 Retro Color','Efx Fragments','Deja Vu'],
+    Tune:        ['Tuner','Vocoder','LWT - Simple tuner','Autotune 7','Key Detector','KHS Pitch Shifter','MAutoPitch','PitchMonster','TONIC','WavesTune','WavesTune RealTime','Melodyne'],
+    Vocals:      ['CLA Vocals','LittleAlterBoy','WavesHarmony','VocalSynth 2','WavesTune RealTime','WavesTune','Melodyne']
+  };
+  const MULTI = ['Mors - Magic switch','Digitalis','Guitar RIG','Murda melodies','One Knob','ShaperBox','Thermal','Turnado','Deja Vu'];
+
+  const folders = getFolders();
+  let n = 0;
+  const add = (name, scope) => folders.push({
+    id: `fol_seed2_${Date.now()}_${(n++)}_${Math.random().toString(36).slice(2,5)}`,
+    type: 'plugin', name, parentId: null, imagen: '', scope
+  });
+  Object.entries(EF).forEach(([sub, names]) => names.forEach(name => add(name, `plugins/efectos/${sub}`)));
+  MULTI.forEach(name => add(name, 'plugins/multiefectos'));
+
+  saveFolders(folders);
+  lsSet('hub_seed_efectos_v1', '1');
+}
+
+// ── Backfill plugin folder descriptions (one-time) ──
+function backfillPluginDesc() {
+  if (lsGet('hub_plugin_desc_v1')) return;
+  const D = {
+    'plugins/generadores/Synth':   { 'Analog':'Synth','ANA 2':'Synth','Analog Lab V':'Synth','Diva':'Synth','Massive X':'Synth','Serum':'Synth','Spire':'Synth','Wavetable':'Synth','Droplets':'Synth' },
+    'plugins/generadores/Piano':   { 'Addictive Keys':'Piano','Imagiro Piano':'Piano','LABS':'Piano','Lofi Keys':'Piano','MNDALA 2':'Piano' },
+    'plugins/generadores/Strings': { 'Augmented YANGTZE':'Strings & Winds' },
+    'plugins/generadores/Guitar':  { 'ESW Vinyl Guitar':'Guitar' },
+    'plugins/generadores/Sampler': { 'Sampler':'Sampler y one shots','Simpler':'Sampler y one shots','Web Sampler':'Sampling from Web','QUANTA':'Polysampler' },
+    'plugins/generadores/Drums':   { 'SSDSampler5':'Drums' },
+    'plugins/efectos/Audio':       { 'Compressor':'Compressor','Glue compressor':'Compressor','EQ Eight':'EQ','Utility':'Volumen','OTT':'Compresor','Pro L':'Limiter','Pro Q2':'EQ','Wider':'Ampliacion' },
+    'plugins/efectos/Delay':       { 'Delay':'Delay','Echo':'Delay','Filter delay':'Delay','Valhalla Delay':'Delay' },
+    'plugins/efectos/Reverb':      { 'Reverb':'Reverb','Foyer':'Reverb','Hybrid Reverb':'Reverb - Freeze tone','Valhalla VintageVerb':'Reverb' },
+    'plugins/efectos/Distorsion':  { 'Overdrive':'Distorsion','Saturator':'Distorsion','BDE':'Distorsion','NudiStort':'Distorsion','Szechuan Saturator':'Saturator' },
+    'plugins/efectos/Drums':       { 'CLA Drums':'Para drums','DS-10 Drum Shaper':'For Drums' },
+    'plugins/efectos/Motion':      { 'Autofilter':'Frecuency','Auto-Pan':'Motion speakers','LFO':'Para mapear' },
+    'plugins/efectos/Steps':       { 'A1TRriggerGate':'Step Secuencer','DS Tantra 2':'Step Secuencer','Filter SEM':'Step Secuencer','KHS Trance Gate':'Step secuencer' },
+    'plugins/efectos/Sidechain':   { 'Compressor':'Compressor','Gate':'Sidechain','KickStarter 2':'Sidechain','LFO Tool':'Sidechain · Step secuencer' },
+    'plugins/efectos/Texturas':    { 'Texturize':'Texture','SoundPlaceIt':'Texture','RC-20 Retro Color':'Retro Distro','Efx Fragments':'Texturas','Deja Vu':'Ralentizarlo - Pasarlo a 1/2' },
+    'plugins/efectos/Tune':        { 'Tuner':'Analysis','Vocoder':'Tune','LWT - Simple tuner':'Tuner → Map to C','Autotune 7':'Tune','Key Detector':'Analyze','KHS Pitch Shifter':'Pitcher','MAutoPitch':'Tune','PitchMonster':'Pitch','TONIC':'Analyze','WavesTune':'Tune','WavesTune RealTime':'Tune','Melodyne':'Tune' },
+    'plugins/efectos/Vocals':      { 'CLA Vocals':'Para Vocals','LittleAlterBoy':'Voces','WavesHarmony':'Vocals','VocalSynth 2':'Vocals','WavesTune RealTime':'Tune','WavesTune':'Tune','Melodyne':'Tune' },
+    'plugins/multiefectos':        { 'Mors - Magic switch':'Randomizador','Digitalis':'Randomizador','Guitar RIG':'MultiEffects','Murda melodies':'Random · Multi effect','One Knob':'Brighter · Driver · Filter · Louder · Phatter · Pumper','ShaperBox':'MultiEffect','Thermal':'MultiEffect · Distorsion','Turnado':'Multieffect','Deja Vu':'Ralentizarlo - Pasarlo a 1/2' }
+  };
+  const folders = getFolders();
+  let changed = false;
+  folders.forEach(f => {
+    if (f.type !== 'plugin' || f.desc) return;
+    const m = D[f.scope];
+    if (m && m[f.name]) { f.desc = m[f.name]; changed = true; }
+  });
+  if (changed) saveFolders(folders);
+  lsSet('hub_plugin_desc_v1', '1');
+}
+
+// ── Arranque: IndexedDB → bajar de Supabase → seeds → render ──
+initStorage().then(async () => {
+  let online = false;
+  try {
+    await remotePull();
+    online = true;
+  } catch (e) {
+    // Sin red se arranca con la caché de IndexedDB y se sube al reconectar.
+    console.error('pull inicial', e);
+  }
+
+  // Las semillas se guardan con un flag local, que un navegador nuevo no tiene.
+  // Si el remoto ya trae carpetas, ese contenido YA está migrado: marcamos los flags
+  // para no volver a crearlo y acabar con las carpetas de plugins duplicadas.
+  let hasRemote = false;
+  try { hasRemote = (JSON.parse(MEM[FOLDERS_KEY]) || []).length > 0; } catch {}
+  if (online && hasRemote) {
+    ['hub_seed_plugins_v1', 'hub_seed_efectos_v1', 'hub_plugin_desc_v1'].forEach(k => {
+      if (!lsGet(k)) { MEM[k] = '1'; idbPut(k, '1'); }
+    });
+  }
+
+  cleanBaseCards();
+  seedPlugins();
+  seedEfectos();
+  backfillPluginDesc();
+  render();
+
+  setSyncBadge(online ? 'ok' : 'off');
+  flushQueue();
+  setInterval(pollRemote, 45000);
+});
+</script>
+</body>
+</html>
