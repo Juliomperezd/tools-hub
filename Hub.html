@@ -126,6 +126,8 @@
       font-family: inherit;
       white-space: nowrap;
     }
+    .btn-white { background: #e8e8e8; border: 1px solid #e8e8e8; color: #0f0f0f; font-weight: 500; }
+    .btn-white:hover { background: #fff; border-color: #fff; }
     .btn-outline { background: transparent; border: 1px solid #e8e8e8; color: #e8e8e8; }
     .btn-outline:hover { background: #e8e8e8; color: #000; }
     .btn-ghost { background: transparent; border: 1px solid #444; color: #aaa; }
@@ -582,6 +584,7 @@
 <div class="main">
   <div class="toolbar">
     <span class="toolbar-title" id="toolbar-title">Armonía</span>
+    <button class="btn btn-white" id="btn-serendipia" title="Una card al azar de todo el Hub">Serendipia</button>
     <input class="search-input" id="search" placeholder="Buscar…" type="text">
     <button class="btn btn-ghost" id="btn-import">Importar JSON</button>
     <button class="btn btn-ghost" id="btn-new-grid">+ Grid</button>
@@ -2686,6 +2689,21 @@ document.querySelectorAll('.sidebar-item').forEach(item => {
 });
 
 document.getElementById('btn-new').addEventListener('click', () => { newFolderId = null; openModal('texto'); });
+
+// ── Serendipia: una card al azar de todo el Hub ──
+// Ignora categoría, subtab y carpeta a propósito: el sentido es sacarte de donde estás.
+// Reutiliza el click de la propia card en vez de construir otro modal, así la elegida
+// llega con todo enganchado (editar, borrar, guardar) igual que si la pulsaras en el grid.
+let _lastSerendipia = null;
+document.getElementById('btn-serendipia').addEventListener('click', () => {
+  const all = getTricks();
+  if (!all.length) return;
+  let pick;
+  do { pick = all[Math.floor(Math.random() * all.length)]; }
+  while (all.length > 1 && pick.id === _lastSerendipia);   // no repetir la anterior seguida
+  _lastSerendipia = pick.id;
+  buildCard(pick).click();
+});
 document.getElementById('btn-new-grid').addEventListener('click', () => { newFolderId = null; openModal('grid'); });
 document.getElementById('btn-cancel').addEventListener('click', closeModal);
 document.getElementById('btn-save-new').addEventListener('click', saveNew);
